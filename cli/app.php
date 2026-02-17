@@ -316,7 +316,7 @@ $app->command('status', function () {
 /**
  * Park a directory with interactive project scanning.
  */
-$app->command('park [path]', function ($path = null, InputInterface $input, OutputInterface $output) {
+$app->command('park [path]', function (InputInterface $input, OutputInterface $output, $path = null) {
     $path = $path ?: getcwd();
     $path = realpath($path);
 
