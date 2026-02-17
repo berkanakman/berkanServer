@@ -188,24 +188,26 @@ Berkan lets you choose between **Apache** and **Nginx** during installation, and
 ## Requirements
 
 - **macOS** (Apple Silicon or Intel)
-- **Homebrew**, **PHP**, and **Composer** are **automatically installed** by `berkan install` if not already present
+- **Homebrew** and **Composer** (installed in the steps below)
 - Port 80/443 are used by default, but **custom ports** can be selected during installation if these are occupied
 
 ## Installation
 
-### Prerequisites
+### Step 1: Install Homebrew
 
-Before installing Berkan, make sure you have:
+If you don't have Homebrew installed, run:
 
-1. **macOS** (Apple Silicon or Intel)
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
 
-That's it! The `berkan install` command will automatically:
-- Install **Homebrew** if it's not already installed
-- Install **PHP** via Homebrew
-- Install **Composer** if it's not already installed
-- Detect **port conflicts** on 80/443 and let you choose alternative ports
+### Step 2: Install PHP and Composer
 
-### Step 1: Install via Composer
+```bash
+brew install php composer
+```
+
+### Step 3: Install Berkan
 
 ```bash
 composer global require berkan/server
@@ -217,8 +219,9 @@ composer global require berkan/server
 > # or on newer Composer versions:
 > export PATH="$HOME/.config/composer/vendor/bin:$PATH"
 > ```
+> Then restart your terminal or run `source ~/.zshrc`.
 
-### Step 2: Install Berkan Services
+### Step 4: Install Berkan Services
 
 ```bash
 sudo berkan install
@@ -282,7 +285,7 @@ Which ports would you like to use?
 ```
 If no conflict is detected, Berkan silently uses the default ports 80/443. Custom ports are saved in `config.json` and all server configurations are automatically updated.
 
-### Step 4: Trust Berkan (Recommended)
+### Step 5: Trust Berkan (Recommended)
 
 This step adds Berkan to sudoers so you don't need to type your password for common operations like `start`, `stop`, `restart`, `secure`, etc.:
 
@@ -290,7 +293,7 @@ This step adds Berkan to sudoers so you don't need to type your password for com
 sudo berkan trust
 ```
 
-### Step 5: Verify Installation
+### Step 6: Verify Installation
 
 ```bash
 berkan status
@@ -316,7 +319,7 @@ Run diagnostics to make sure everything is correctly configured:
 berkan diagnose
 ```
 
-### Step 6: Park Your Projects Directory
+### Step 7: Park Your Projects Directory
 
 ```bash
 mkdir -p ~/Sites
@@ -402,32 +405,36 @@ sudo berkan restart
 ## Quick Start
 
 ```bash
-# 1. Install Berkan
+# 1. Install Homebrew, PHP, and Composer (skip if already installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install php composer
+
+# 2. Install Berkan
 composer global require berkan/server
 
-# 2. Install services (interactive — choose web server, PHP versions, databases)
+# 3. Install services (interactive — choose web server, PHP versions, databases)
 sudo berkan install
 
-# 3. Park your projects directory (interactive — scans projects, asks PHP version per project)
+# 4. Park your projects directory (interactive — scans projects, asks PHP version per project)
 cd ~/Sites
 berkan park
 
-# 4. Create a Laravel project
+# 5. Create a Laravel project
 composer create-project laravel/laravel myapp
 
-# 4. Visit in browser
+# 6. Visit in browser
 # http://myapp.test
 
-# 5. Secure with HTTPS
+# 7. Secure with HTTPS
 sudo berkan secure myapp
 
-# 6. Visit with HTTPS
+# 8. Visit with HTTPS
 # https://myapp.test
 
-# 7. Install an older PHP version for a legacy project
+# 9. Install an older PHP version for a legacy project
 sudo berkan php:install 7.4
 
-# 8. Isolate a legacy site to PHP 7.4
+# 10. Isolate a legacy site to PHP 7.4
 cd ~/Sites/legacy-app
 berkan isolate 7.4
 ```
@@ -1553,24 +1560,26 @@ Berkan, kurulum sırasında **Apache** veya **Nginx** arasında seçim yapmanız
 ## Gereksinimler
 
 - **macOS** (Apple Silicon veya Intel)
-- **Homebrew**, **PHP** ve **Composer** kurulu değilse `berkan install` tarafından **otomatik olarak kurulur**
+- **Homebrew** ve **Composer** (aşağıdaki adımlarda kurulur)
 - Port 80/443 varsayılan olarak kullanılır, ancak bu portlar doluysa kurulum sırasında **özel portlar** seçilebilir
 
 ## Kurulum
 
-### Ön Gereksinimler
+### Adım 1: Homebrew Kurulumu
 
-Berkan'ı kurmadan önce sadece şunlara ihtiyacınız var:
+Homebrew kurulu değilse:
 
-1. **macOS** (Apple Silicon veya Intel)
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
 
-Hepsi bu kadar! `berkan install` komutu otomatik olarak:
-- **Homebrew** kurulu değilse kurar
-- Homebrew ile **PHP** kurar
-- **Composer** kurulu değilse kurar
-- Port 80/443 üzerinde **çakışma varsa algılar** ve alternatif port seçmenizi sağlar
+### Adım 2: PHP ve Composer Kurulumu
 
-### Adım 1: Composer ile Kurun
+```bash
+brew install php composer
+```
+
+### Adım 3: Berkan Kurulumu
 
 ```bash
 composer global require berkan/server
@@ -1582,8 +1591,9 @@ composer global require berkan/server
 > # veya yeni Composer versiyonlarında:
 > export PATH="$HOME/.config/composer/vendor/bin:$PATH"
 > ```
+> Ardından terminalinizi yeniden başlatın veya `source ~/.zshrc` çalıştırın.
 
-### Adım 2: Berkan Servislerini Kurun
+### Adım 4: Berkan Servislerini Kurun
 
 ```bash
 sudo berkan install
@@ -1647,7 +1657,7 @@ Which ports would you like to use?
 ```
 Çakışma yoksa Berkan sessizce varsayılan 80/443 portlarını kullanır. Özel portlar `config.json`'a kaydedilir ve tüm sunucu konfigürasyonları otomatik güncellenir.
 
-### Adım 4: Berkan'ı Güvenilir Yapın (Önerilen)
+### Adım 5: Berkan'ı Güvenilir Yapın (Önerilen)
 
 Bu adım Berkan'ı sudoers'a ekler, böylece `start`, `stop`, `restart`, `secure` gibi yaygın komutlarda şifre girmeniz gerekmez:
 
@@ -1655,7 +1665,7 @@ Bu adım Berkan'ı sudoers'a ekler, böylece `start`, `stop`, `restart`, `secure
 sudo berkan trust
 ```
 
-### Adım 5: Kurulumu Doğrulayın
+### Adım 6: Kurulumu Doğrulayın
 
 ```bash
 berkan status
@@ -1681,7 +1691,7 @@ Her şeyin doğru yapılandırıldığından emin olmak için tanı aracını ç
 berkan diagnose
 ```
 
-### Adım 6: Projeler Dizininizi Park Edin
+### Adım 7: Projeler Dizininizi Park Edin
 
 ```bash
 mkdir -p ~/Sites
@@ -1767,32 +1777,36 @@ sudo berkan restart
 ## Hızlı Başlangıç
 
 ```bash
-# 1. Berkan'ı kurun
+# 1. Homebrew, PHP ve Composer kurun (zaten kuruluysa atlayın)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install php composer
+
+# 2. Berkan'ı kurun
 composer global require berkan/server
 
-# 2. Servisleri kurun (interaktif — web sunucu, PHP versiyonları, veritabanları seçin)
+# 3. Servisleri kurun (interaktif — web sunucu, PHP versiyonları, veritabanları seçin)
 sudo berkan install
 
-# 3. Projeler dizininizi park edin (interaktif — projeleri tarar, proje başına PHP versiyonu sorar)
+# 4. Projeler dizininizi park edin (interaktif — projeleri tarar, proje başına PHP versiyonu sorar)
 cd ~/Sites
 berkan park
 
-# 3. Bir Laravel projesi oluşturun
+# 5. Bir Laravel projesi oluşturun
 composer create-project laravel/laravel myapp
 
-# 4. Tarayıcıda ziyaret edin
+# 6. Tarayıcıda ziyaret edin
 # http://myapp.test
 
-# 5. HTTPS ile güvenli hale getirin
+# 7. HTTPS ile güvenli hale getirin
 sudo berkan secure myapp
 
-# 6. HTTPS ile ziyaret edin
+# 8. HTTPS ile ziyaret edin
 # https://myapp.test
 
-# 7. Eski bir proje için eski PHP versiyonu kurun
+# 9. Eski bir proje için eski PHP versiyonu kurun
 sudo berkan php:install 7.4
 
-# 8. Eski siteyi PHP 7.4'e izole edin
+# 10. Eski siteyi PHP 7.4'e izole edin
 cd ~/Sites/eski-uygulama
 berkan isolate 7.4
 ```
