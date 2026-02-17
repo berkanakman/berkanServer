@@ -29,7 +29,10 @@ class CommandLine
      */
     public function runAsUser(string $command, ?callable $onError = null): string
     {
-        return $this->run('sudo -u "' . user() . '" ' . $command, $onError);
+        $user = user();
+        $home = posix_getpwnam($user)['dir'] ?? '/Users/' . $user;
+
+        return $this->run('sudo -u "' . $user . '" HOME="' . $home . '" ' . $command, $onError);
     }
 
     /**
