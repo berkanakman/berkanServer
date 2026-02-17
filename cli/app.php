@@ -29,14 +29,27 @@ $app->command('install', function (InputInterface $input, OutputInterface $outpu
     // ============================================================
 
     // Check Homebrew
-    $brewCheck = trim($cli->runAsUser('which brew 2>/dev/null'));
-    if (empty($brewCheck)) {
+    $brewPaths = [BREW_PREFIX . '/bin/brew', '/usr/local/bin/brew', '/opt/homebrew/bin/brew'];
+    $brewBin = null;
+    foreach ($brewPaths as $path) {
+        if (file_exists($path)) {
+            $brewBin = $path;
+            break;
+        }
+    }
+
+    if (! $brewBin) {
         info('Homebrew is not installed. Installing Homebrew...');
-        $cli->passthru('/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"');
+        $cli->runAsUser('/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"');
 
         // Verify installation
-        $brewCheck = trim($cli->runAsUser('which brew 2>/dev/null'));
-        if (empty($brewCheck)) {
+        foreach ($brewPaths as $path) {
+            if (file_exists($path)) {
+                $brewBin = $path;
+                break;
+            }
+        }
+        if (! $brewBin) {
             warning('Homebrew installation failed. Please install manually: https://brew.sh');
             return;
         }
@@ -49,7 +62,7 @@ $app->command('install', function (InputInterface $input, OutputInterface $outpu
     $composerCheck = trim($cli->runAsUser('which composer 2>/dev/null'));
     if (empty($composerCheck)) {
         info('Composer is not installed. Installing via Homebrew...');
-        $cli->runAsUser('brew install composer');
+        $cli->runAsUser($brewBin . ' install composer');
 
         $composerCheck = trim($cli->runAsUser('which composer 2>/dev/null'));
         if (empty($composerCheck)) {
