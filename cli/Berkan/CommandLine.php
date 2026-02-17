@@ -31,9 +31,25 @@ class CommandLine
     {
         if (posix_getuid() === 0) {
             $user = user();
-            $process = new Process(['sudo', '-u', $user, 'bash', '-lc', $command]);
+            $userInfo = posix_getpwnam($user);
+            $home = $userInfo['dir'];
+
+            $script = '#!/bin/bash' . "\n"
+                . 'export HOME=' . escapeshellarg($home) . "\n"
+                . 'export USER=' . escapeshellarg($user) . "\n"
+                . 'export LOGNAME=' . escapeshellarg($user) . "\n"
+                . 'export PATH="' . BREW_PREFIX . '/bin:' . BREW_PREFIX . '/sbin:/usr/bin:/bin:/usr/sbin:/sbin"' . "\n"
+                . $command . "\n";
+
+            $wrapper = sys_get_temp_dir() . '/berkan_run_' . getmypid() . '.sh';
+            file_put_contents($wrapper, $script);
+            chmod($wrapper, 0755);
+
+            $process = new Process(['sudo', '-u', $user, 'bash', $wrapper]);
             $process->setTimeout(null);
             $process->run();
+
+            @unlink($wrapper);
 
             if ($process->getExitCode() > 0) {
                 if ($onError) {
