@@ -271,7 +271,7 @@ class Apache implements WebServer
      */
     public function configTestCommand(): string
     {
-        return 'sudo apachectl configtest 2>&1';
+        return 'sudo -u "' . user() . '" ' . BREW_PREFIX . '/bin/httpd -t -f ' . $this->apacheConfPath() . ' 2>&1';
     }
 
     /**

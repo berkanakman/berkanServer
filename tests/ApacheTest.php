@@ -55,7 +55,7 @@ class ApacheTest extends TestCase
 
     public function test_config_test_command(): void
     {
-        $this->assertEquals('sudo apachectl configtest 2>&1', $this->apache->configTestCommand());
+        $this->assertEquals('sudo -u "berkanakman" /opt/homebrew/bin/httpd -t -f /opt/homebrew/etc/httpd/httpd.conf 2>&1', $this->apache->configTestCommand());
     }
 
     public function test_conf_path(): void
@@ -209,7 +209,7 @@ class ApacheTest extends TestCase
     public function test_restart_checks_config_before_restarting(): void
     {
         $this->cli->method('run')
-            ->with('sudo apachectl configtest 2>&1')
+            ->with('sudo -u "berkanakman" /opt/homebrew/bin/httpd -t -f /opt/homebrew/etc/httpd/httpd.conf 2>&1')
             ->willReturn('Syntax OK');
 
         $this->brew->expects($this->once())
@@ -222,7 +222,7 @@ class ApacheTest extends TestCase
     public function test_restart_does_not_restart_on_config_failure(): void
     {
         $this->cli->method('run')
-            ->with('sudo apachectl configtest 2>&1')
+            ->with('sudo -u "berkanakman" /opt/homebrew/bin/httpd -t -f /opt/homebrew/etc/httpd/httpd.conf 2>&1')
             ->willReturn('AH00526: Syntax error');
 
         $this->brew->expects($this->never())
