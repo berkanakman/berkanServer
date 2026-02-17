@@ -19,10 +19,53 @@ $app->command('install', function (InputInterface $input, OutputInterface $outpu
     should_be_sudo();
 
     info('Installing Berkan...');
+    output('');
 
     $helper = $this->getHelperSet()->get('question');
+    $cli = resolve(\Berkan\CommandLine::class);
 
+    // ============================================================
+    // 0. Check & install prerequisites (Homebrew, Composer)
+    // ============================================================
+
+    // Check Homebrew
+    $brewCheck = trim($cli->runAsUser('which brew 2>/dev/null'));
+    if (empty($brewCheck)) {
+        info('Homebrew is not installed. Installing Homebrew...');
+        $cli->passthru('/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"');
+
+        // Verify installation
+        $brewCheck = trim($cli->runAsUser('which brew 2>/dev/null'));
+        if (empty($brewCheck)) {
+            warning('Homebrew installation failed. Please install manually: https://brew.sh');
+            return;
+        }
+        info('Homebrew installed successfully.');
+    } else {
+        info('Homebrew: OK');
+    }
+
+    // Check Composer
+    $composerCheck = trim($cli->runAsUser('which composer 2>/dev/null'));
+    if (empty($composerCheck)) {
+        info('Composer is not installed. Installing via Homebrew...');
+        $cli->runAsUser('brew install composer');
+
+        $composerCheck = trim($cli->runAsUser('which composer 2>/dev/null'));
+        if (empty($composerCheck)) {
+            warning('Composer installation failed. Please install manually: https://getcomposer.org');
+            return;
+        }
+        info('Composer installed successfully.');
+    } else {
+        info('Composer: OK');
+    }
+
+    output('');
+
+    // ============================================================
     // 1. Web server selection
+    // ============================================================
     $webServerQuestion = new ChoiceQuestion(
         'Which web server would you like to use?',
         ['Apache', 'Nginx'],
@@ -31,16 +74,20 @@ $app->command('install', function (InputInterface $input, OutputInterface $outpu
     $webServerChoice = $helper->ask($input, $output, $webServerQuestion);
     $webServer = strtolower($webServerChoice) === 'nginx' ? 'nginx' : 'apache';
 
+    // ============================================================
     // 2. PHP version selection
+    // ============================================================
     $phpVersionQuestion = new ChoiceQuestion(
         'Which PHP versions would you like to install? (comma-separated numbers)',
-        ['8.4', '8.3', '8.2', '8.1'],
+        ['8.4', '8.3', '8.2', '8.1', '8.0', '7.4', '7.3', '7.2', '7.1', '7.0', '5.6'],
         '0'
     );
     $phpVersionQuestion->setMultiselect(true);
     $phpVersions = $helper->ask($input, $output, $phpVersionQuestion);
 
+    // ============================================================
     // 3. Database selection
+    // ============================================================
     $dbQuestion = new ChoiceQuestion(
         'Which databases would you like to install? (comma-separated numbers, or press Enter to skip)',
         ['MySQL', 'PostgreSQL', 'MongoDB', 'Redis', 'None'],
@@ -63,33 +110,97 @@ $app->command('install', function (InputInterface $input, OutputInterface $outpu
         }
     }
 
-    // Install configuration
+    // ============================================================
+    // 4. Port conflict detection
+    // ============================================================
+    $httpPort = '80';
+    $httpsPort = '443';
+
+    $port80InUse = trim($cli->run('lsof -ti :80 2>/dev/null'));
+    $port443InUse = trim($cli->run('lsof -ti :443 2>/dev/null'));
+
+    if (! empty($port80InUse) || ! empty($port443InUse)) {
+        output('');
+        warning('Port conflict detected!');
+
+        if (! empty($port80InUse)) {
+            warning("  Port 80 is in use (PID: {$port80InUse})");
+        }
+        if (! empty($port443InUse)) {
+            warning("  Port 443 is in use (PID: {$port443InUse})");
+        }
+
+        output('');
+
+        $portQuestion = new ChoiceQuestion(
+            'How would you like to resolve the port conflict?',
+            [
+                'Use default ports anyway (80/443) — stop conflicting services manually',
+                'Use alternative ports (8080/8443)',
+                'Use alternative ports (8888/8843)',
+                'Enter custom ports',
+            ],
+            0
+        );
+        $portChoice = $helper->ask($input, $output, $portQuestion);
+
+        if ($portChoice === 'Use alternative ports (8080/8443)') {
+            $httpPort = '8080';
+            $httpsPort = '8443';
+        } elseif ($portChoice === 'Use alternative ports (8888/8843)') {
+            $httpPort = '8888';
+            $httpsPort = '8843';
+        } elseif ($portChoice === 'Enter custom ports') {
+            $httpPortQ = new \Symfony\Component\Console\Question\Question('  HTTP port [80]: ', '80');
+            $httpPort = $helper->ask($input, $output, $httpPortQ);
+
+            $httpsPortQ = new \Symfony\Component\Console\Question\Question('  HTTPS port [443]: ', '443');
+            $httpsPort = $helper->ask($input, $output, $httpsPortQ);
+        }
+
+        info("Using ports: HTTP={$httpPort}, HTTPS={$httpsPort}");
+    }
+
+    // ============================================================
+    // 5. Install configuration
+    // ============================================================
     $config = resolve(\Berkan\Configuration::class);
     $config->install();
     $config->updateKey('web_server', $webServer);
     $config->updateKey('php_versions', $phpVersions);
     $config->updateKey('databases', $databases);
+    $config->updateKey('http_port', $httpPort);
+    $config->updateKey('https_port', $httpsPort);
 
     // Install web server
     resolve(\Berkan\Contracts\WebServer::class)->install();
 
-    // Install PHP versions
+    // ============================================================
+    // 6. Install PHP versions
+    // ============================================================
     $phpFpm = resolve(\Berkan\PhpFpm::class);
     $phpFpm->install();
 
+    $brew = resolve(\Berkan\Brew::class);
     foreach ($phpVersions as $version) {
         $formula = 'php@' . $version;
-        $brew = resolve(\Berkan\Brew::class);
 
         if (! $brew->installed($formula) && ! ($version === '8.4' && $brew->installed('php'))) {
+            if ($brew->requiresTap($formula)) {
+                $brew->tap(['shivammathur/php']);
+            }
             $brew->ensureInstalled($formula);
         }
     }
 
-    // Install DNS
+    // ============================================================
+    // 7. Install DNS
+    // ============================================================
     resolve(\Berkan\DnsMasq::class)->install($config->read()['tld'] ?? 'test');
 
-    // Install databases
+    // ============================================================
+    // 8. Install databases
+    // ============================================================
     if (! empty($databases)) {
         $database = resolve(\Berkan\Database::class);
         foreach ($databases as $db) {
@@ -99,9 +210,13 @@ $app->command('install', function (InputInterface $input, OutputInterface $outpu
 
     resolve(\Berkan\Berkan::class)->symlinkToUsersBin();
 
+    output('');
     info('Berkan installed successfully!');
     info('Web Server: ' . ucfirst($webServer));
     info('PHP Versions: ' . implode(', ', $phpVersions));
+    if ($httpPort !== '80' || $httpsPort !== '443') {
+        info("Ports: HTTP={$httpPort}, HTTPS={$httpsPort}");
+    }
     if (! empty($databases)) {
         info('Databases: ' . implode(', ', $databases));
     }
@@ -199,15 +314,54 @@ $app->command('status', function () {
 })->descriptions('Display the status of Berkan services');
 
 /**
- * Park a directory.
+ * Park a directory with interactive project scanning.
  */
-$app->command('park [path]', function ($path = null) {
+$app->command('park [path]', function ($path = null, InputInterface $input, OutputInterface $output) {
     $path = $path ?: getcwd();
     $path = realpath($path);
 
-    resolve(\Berkan\Configuration::class)->addPath($path);
+    $config = resolve(\Berkan\Configuration::class);
+    $config->addPath($path);
 
-    info("This directory [{$path}] has been added to Berkan's paths.");
+    $site = resolve(\Berkan\Site::class);
+    $projects = $site->scanProjects($path);
+
+    if (empty($projects)) {
+        info("Path [{$path}] parked. No projects found yet.");
+        return;
+    }
+
+    $helper = $this->getHelperSet()->get('question');
+    $brew = resolve(\Berkan\Brew::class);
+    $installedPhp = $brew->supportedPhpVersions();
+
+    // PHP choices list
+    $phpChoices = ['Default (global PHP)'];
+    foreach ($installedPhp as $v) {
+        $versionLabel = str_replace(['php@', 'php'], '', $v) ?: 'latest';
+        $phpChoices[] = $versionLabel;
+    }
+
+    info("Found " . count($projects) . " projects in [{$path}]:");
+    output('');
+
+    foreach ($projects as $project) {
+        $question = new ChoiceQuestion(
+            "  {$project['name']} [{$project['framework']}] — PHP version?",
+            $phpChoices,
+            0
+        );
+        $choice = $helper->ask($input, $output, $question);
+
+        if ($choice !== 'Default (global PHP)') {
+            $phpVersion = ($choice === 'latest') ? 'php' : 'php@' . $choice;
+            $site->isolate($project['name'], $phpVersion);
+            resolve(\Berkan\PhpFpm::class)->isolateVersion($phpVersion);
+        }
+    }
+
+    resolve(\Berkan\Contracts\WebServer::class)->restart();
+    info("Path [{$path}] has been parked with project configurations.");
 })->descriptions('Register a directory as a parked path for Berkan');
 
 /**
@@ -657,6 +811,10 @@ $app->command('php:install version', function ($version) {
     if ($brew->installed($formula)) {
         info("PHP {$version} is already installed.");
         return;
+    }
+
+    if ($brew->requiresTap($formula)) {
+        $brew->tap(['shivammathur/php']);
     }
 
     $brew->installOrFail($formula);

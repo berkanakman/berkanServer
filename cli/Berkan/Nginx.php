@@ -63,6 +63,8 @@ class Nginx implements WebServer
             [
                 'VALET_HOMEBREW_PATH',
                 'VALET_LOOPBACK',
+                'VALET_HTTP_PORT',
+                'VALET_HTTPS_PORT',
                 'VALET_USER',
                 'VALET_GROUP',
                 'VALET_HOME_PATH',
@@ -71,6 +73,8 @@ class Nginx implements WebServer
             [
                 BREW_PREFIX,
                 $config['loopback'] ?? BERKAN_LOOPBACK,
+                $config['http_port'] ?? '80',
+                $config['https_port'] ?? '443',
                 user(),
                 'staff',
                 $this->config->homePath(),

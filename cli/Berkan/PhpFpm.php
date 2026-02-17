@@ -15,6 +15,13 @@ class PhpFpm
         'php@8.3',
         'php@8.2',
         'php@8.1',
+        'php@8.0',
+        'php@7.4',
+        'php@7.3',
+        'php@7.2',
+        'php@7.1',
+        'php@7.0',
+        'php@5.6',
     ];
 
     /**
@@ -46,7 +53,7 @@ class PhpFpm
     /**
      * Install the PHP-FPM configuration.
      */
-    public function installConfiguration(?string $phpVersion = null): void
+    public function installConfiguration(?string $phpVersion = null, bool $isolated = false): void
     {
         $phpVersion = $phpVersion ?: $this->brew->getLinkedPhpFormula();
 
@@ -55,15 +62,32 @@ class PhpFpm
             return;
         }
 
-        $contents = $this->files->get(__DIR__ . '/../stubs/etc-phpfpm-berkan.conf');
+        if ($isolated) {
+            $contents = $this->files->get(__DIR__ . '/../stubs/etc-phpfpm-berkan-isolated.conf');
+        } else {
+            $contents = $this->files->get(__DIR__ . '/../stubs/etc-phpfpm-berkan.conf');
+        }
+
         $fpmConfigPath = $this->fpmConfigPath($phpVersion);
+
+        if ($isolated) {
+            $fpmConfigPath = str_replace('berkan-fpm.conf', 'berkan-isolated-fpm.conf', $fpmConfigPath);
+        }
 
         $this->files->ensureDirExists(dirname($fpmConfigPath), user());
 
-        $this->files->put(
-            $fpmConfigPath,
-            $this->buildFpmConfig($contents, $phpVersion)
-        );
+        $configContent = $this->buildFpmConfig($contents, $phpVersion);
+
+        if ($isolated) {
+            $versionNumber = str_replace(['php@', 'php'], '', $phpVersion) ?: $this->brew->getPhpVersion($phpVersion);
+            $configContent = str_replace(
+                ['VALET_PHP_VERSION', 'VALET_ISOLATED_SOCKET'],
+                [$versionNumber, $this->isolatedSocketPath($phpVersion)],
+                $configContent
+            );
+        }
+
+        $this->files->put($fpmConfigPath, $configContent);
 
         // Install error log configuration
         $this->installErrorLogConfiguration($phpVersion);
@@ -187,6 +211,15 @@ class PhpFpm
     }
 
     /**
+     * Get the isolated PHP-FPM socket path for a specific version.
+     */
+    public function isolatedSocketPath(string $phpVersion): string
+    {
+        $versionNumber = str_replace(['php@', 'php'], '', $phpVersion) ?: $this->brew->getPhpVersion($phpVersion);
+        return $this->config->homePath() . '/berkan-' . $versionNumber . '.sock';
+    }
+
+    /**
      * Get the status of PHP-FPM.
      */
     public function status(): string
@@ -268,7 +301,11 @@ class PhpFpm
      */
     public function isolateVersion(string $phpVersion): void
     {
-        $this->installConfiguration($phpVersion);
+        if (! $this->brew->installed($phpVersion)) {
+            $this->brew->installOrFail($phpVersion);
+        }
+
+        $this->installConfiguration($phpVersion, true);
         $this->brew->restartService($phpVersion);
     }
 

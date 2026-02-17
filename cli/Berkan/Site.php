@@ -104,6 +104,47 @@ class Site
     }
 
     /**
+     * Scan a directory for projects and detect their frameworks.
+     */
+    public function scanProjects(string $path): array
+    {
+        $projects = [];
+
+        foreach ($this->files->scandir($path) as $dir) {
+            $fullPath = $path . '/' . $dir;
+
+            if (! $this->files->isDir($fullPath)) {
+                continue;
+            }
+
+            $projects[] = [
+                'name' => $dir,
+                'path' => $fullPath,
+                'framework' => $this->detectFramework($fullPath),
+            ];
+        }
+
+        return $projects;
+    }
+
+    /**
+     * Detect the framework used in a project directory.
+     */
+    public function detectFramework(string $sitePath): string
+    {
+        if (file_exists($sitePath . '/artisan')) return 'Laravel';
+        if (file_exists($sitePath . '/bin/console') && file_exists($sitePath . '/public/index.php')) return 'Symfony';
+        if (file_exists($sitePath . '/wp-config.php')) return 'WordPress';
+        if (file_exists($sitePath . '/core/lib/Drupal.php')) return 'Drupal';
+        if (file_exists($sitePath . '/bin/magento')) return 'Magento 2';
+        if (file_exists($sitePath . '/craft')) return 'Craft CMS';
+        if (file_exists($sitePath . '/configuration.php') && is_dir($sitePath . '/administrator')) return 'Joomla';
+        if (file_exists($sitePath . '/composer.json')) return 'PHP (Composer)';
+        if (glob($sitePath . '/*.php')) return 'Plain PHP';
+        return 'Static/Unknown';
+    }
+
+    /**
      * Get all sites from parked paths and linked sites.
      */
     public function parked(): \Illuminate\Support\Collection
@@ -280,16 +321,26 @@ class Site
      */
     public function buildSecureServer(string $url): string
     {
-        $tld = $this->config->read()['tld'];
+        $config = $this->config->read();
+        $tld = $config['tld'];
         $fullUrl = $url . '.' . $tld;
         $certsPath = $this->certificatesPath();
         $sitePath = $this->getSitePath($url);
+
+        $phpSocket = 'berkan.sock';
+        $isolatedVersion = $this->phpVersion($url);
+        if ($isolatedVersion) {
+            $versionNum = str_replace(['php@', 'php'], '', $isolatedVersion) ?: $isolatedVersion;
+            $phpSocket = 'berkan-' . $versionNum . '.sock';
+        }
 
         $stub = $this->files->get(__DIR__ . '/../stubs/' . $this->stubPrefix() . 'secure.berkan.conf');
 
         return str_replace(
             [
                 'VALET_LOOPBACK',
+                'VALET_HTTP_PORT',
+                'VALET_HTTPS_PORT',
                 'VALET_SITE',
                 'VALET_TLD',
                 'VALET_SITE_PATH',
@@ -300,7 +351,9 @@ class Site
                 'VALET_PHP_SOCKET',
             ],
             [
-                $this->config->read()['loopback'] ?? BERKAN_LOOPBACK,
+                $config['loopback'] ?? BERKAN_LOOPBACK,
+                $config['http_port'] ?? '80',
+                $config['https_port'] ?? '443',
                 $url,
                 $tld,
                 $sitePath,
@@ -308,7 +361,7 @@ class Site
                 realpath(__DIR__ . '/../../'),
                 $certsPath . '/' . $fullUrl . '.crt',
                 $certsPath . '/' . $fullUrl . '.key',
-                'berkan.sock',
+                $phpSocket,
             ],
             $stub
         );
@@ -319,14 +372,24 @@ class Site
      */
     public function buildServer(string $url): string
     {
-        $tld = $this->config->read()['tld'];
+        $config = $this->config->read();
+        $tld = $config['tld'];
         $sitePath = $this->getSitePath($url);
+
+        $phpSocket = 'berkan.sock';
+        $isolatedVersion = $this->phpVersion($url);
+        if ($isolatedVersion) {
+            $versionNum = str_replace(['php@', 'php'], '', $isolatedVersion) ?: $isolatedVersion;
+            $phpSocket = 'berkan-' . $versionNum . '.sock';
+        }
 
         $stub = $this->files->get(__DIR__ . '/../stubs/' . $this->stubPrefix() . 'site.berkan.conf');
 
         return str_replace(
             [
                 'VALET_LOOPBACK',
+                'VALET_HTTP_PORT',
+                'VALET_HTTPS_PORT',
                 'VALET_SITE',
                 'VALET_TLD',
                 'VALET_SITE_PATH',
@@ -335,13 +398,15 @@ class Site
                 'VALET_PHP_SOCKET',
             ],
             [
-                $this->config->read()['loopback'] ?? BERKAN_LOOPBACK,
+                $config['loopback'] ?? BERKAN_LOOPBACK,
+                $config['http_port'] ?? '80',
+                $config['https_port'] ?? '443',
                 $url,
                 $tld,
                 $sitePath,
                 $this->config->homePath(),
                 realpath(__DIR__ . '/../../'),
-                'berkan.sock',
+                $phpSocket,
             ],
             $stub
         );
@@ -352,7 +417,8 @@ class Site
      */
     public function buildProxyServer(string $url, string $host): string
     {
-        $tld = $this->config->read()['tld'];
+        $config = $this->config->read();
+        $tld = $config['tld'];
 
         $stub = $this->files->get(__DIR__ . '/../stubs/' . $this->stubPrefix() . 'proxy.berkan.conf');
 
@@ -362,6 +428,7 @@ class Site
         return str_replace(
             [
                 'VALET_LOOPBACK',
+                'VALET_HTTP_PORT',
                 'VALET_SITE',
                 'VALET_TLD',
                 'VALET_HOME_PATH',
@@ -369,7 +436,8 @@ class Site
                 'VALET_PROXY_HOST_WS',
             ],
             [
-                $this->config->read()['loopback'] ?? BERKAN_LOOPBACK,
+                $config['loopback'] ?? BERKAN_LOOPBACK,
+                $config['http_port'] ?? '80',
                 $url,
                 $tld,
                 $this->config->homePath(),
@@ -385,7 +453,8 @@ class Site
      */
     public function buildSecureProxyServer(string $url, string $host): string
     {
-        $tld = $this->config->read()['tld'];
+        $config = $this->config->read();
+        $tld = $config['tld'];
         $fullUrl = $url . '.' . $tld;
         $certsPath = $this->certificatesPath();
 
@@ -396,6 +465,8 @@ class Site
         return str_replace(
             [
                 'VALET_LOOPBACK',
+                'VALET_HTTP_PORT',
+                'VALET_HTTPS_PORT',
                 'VALET_SITE',
                 'VALET_TLD',
                 'VALET_HOME_PATH',
@@ -405,7 +476,9 @@ class Site
                 'VALET_PROXY_HOST_WS',
             ],
             [
-                $this->config->read()['loopback'] ?? BERKAN_LOOPBACK,
+                $config['loopback'] ?? BERKAN_LOOPBACK,
+                $config['http_port'] ?? '80',
+                $config['https_port'] ?? '443',
                 $url,
                 $tld,
                 $this->config->homePath(),

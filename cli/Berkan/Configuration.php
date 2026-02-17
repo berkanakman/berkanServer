@@ -137,6 +137,8 @@ class Configuration
             $this->write([
                 'tld' => 'test',
                 'loopback' => BERKAN_LOOPBACK,
+                'http_port' => '80',
+                'https_port' => '443',
                 'paths' => [],
                 'web_server' => 'apache',
                 'php_versions' => ['8.4'],
@@ -206,6 +208,8 @@ class Configuration
             return [
                 'tld' => 'test',
                 'loopback' => BERKAN_LOOPBACK,
+                'http_port' => '80',
+                'https_port' => '443',
                 'paths' => [],
                 'web_server' => 'apache',
                 'php_versions' => ['8.4'],

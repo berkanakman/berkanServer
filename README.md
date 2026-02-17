@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/PHP-8.1+-8892BF?style=flat-square" alt="PHP 8.1+">
+  <img src="https://img.shields.io/badge/PHP-5.6--8.4-8892BF?style=flat-square" alt="PHP 5.6-8.4">
   <img src="https://img.shields.io/badge/macOS-Apple%20Silicon%20%26%20Intel-000000?style=flat-square" alt="macOS">
   <img src="https://img.shields.io/badge/Web%20Server-Apache%20%7C%20Nginx-D22128?style=flat-square" alt="Apache | Nginx">
   <img src="https://img.shields.io/badge/Database-MySQL%20%7C%20PostgreSQL%20%7C%20MongoDB%20%7C%20Redis-336791?style=flat-square" alt="Databases">
@@ -98,6 +98,7 @@ Berkan lets you choose between **Apache** and **Nginx** during installation, and
 ### Site Serving
 
 - **Zero-configuration** - park a directory and every subfolder is instantly a `.test` site
+- **Interactive park** - `berkan park` scans projects, detects frameworks, and lets you assign PHP versions per project
 - **Park** entire directories: `~/Sites/blog` becomes `http://blog.test`
 - **Link** individual projects from anywhere on disk with custom names
 - **Automatic framework detection** via the driver system (25+ built-in drivers)
@@ -116,10 +117,14 @@ Berkan lets you choose between **Apache** and **Nginx** during installation, and
 
 ### PHP Management
 
-- **Global PHP version switching** between PHP 8.1, 8.2, 8.3, 8.4
+- **Full PHP version range**: PHP 5.6, 7.0–7.4, 8.0–8.4 supported via `shivammathur/php` tap
+- **Global PHP version switching** between any installed PHP version
 - **Install/remove PHP versions** at any time with `berkan php:install` / `berkan php:remove`
 - **List installed PHP versions** with `berkan php:list`
 - **Per-site PHP isolation** - different sites can run different PHP versions simultaneously
+- **Per-project PHP selection via `berkan park`** - interactive project scanning with automatic framework detection and PHP version assignment
+- **Isolated PHP-FPM pools** - each isolated version gets its own socket (`berkan-7.4.sock`, `berkan-8.1.sock`, etc.)
+- **Automatic framework detection** during park: Laravel, Symfony, WordPress, Drupal, Magento 2, Craft CMS, Joomla, Composer projects, Plain PHP
 - `berkan php` - run PHP CLI using Berkan's managed version
 - `berkan composer` - run Composer with the correct PHP binary
 - Automatic **PHP-FPM pool configuration** with Unix socket (`berkan.sock`)
@@ -183,42 +188,22 @@ Berkan lets you choose between **Apache** and **Nginx** during installation, and
 ## Requirements
 
 - **macOS** (Apple Silicon or Intel)
-- **[Homebrew](https://brew.sh)**
-- **PHP 8.1+** (installed via Homebrew)
-- No other web servers (Nginx, Apache) should be using port 80/443
+- **Homebrew**, **PHP**, and **Composer** are **automatically installed** by `berkan install` if not already present
+- Port 80/443 are used by default, but **custom ports** can be selected during installation if these are occupied
 
 ## Installation
 
 ### Prerequisites
 
-Before installing Berkan, make sure you have the following:
+Before installing Berkan, make sure you have:
 
 1. **macOS** (Apple Silicon or Intel)
 
-2. **Homebrew** - If you don't have Homebrew installed, install it first:
-   ```bash
-   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   ```
-
-3. **PHP 8.1+** - Install PHP via Homebrew if you don't already have it:
-   ```bash
-   brew install php
-   ```
-
-4. **Composer** - Install Composer (PHP dependency manager):
-   ```bash
-   brew install composer
-   ```
-
-5. **Port 80 and 443 must be free** - Make sure no other web server (Apache, Nginx, MAMP, XAMPP, etc.) is running on these ports:
-   ```bash
-   # Check if anything is using port 80
-   sudo lsof -i :80
-
-   # If macOS built-in Apache is running, stop it
-   sudo apachectl stop
-   sudo launchctl unload -w /System/Library/LaunchDaemons/org.apache.httpd.plist 2>/dev/null
-   ```
+That's it! The `berkan install` command will automatically:
+- Install **Homebrew** if it's not already installed
+- Install **PHP** via Homebrew
+- Install **Composer** if it's not already installed
+- Detect **port conflicts** on 80/443 and let you choose alternative ports
 
 ### Step 1: Clone the Repository
 
@@ -241,7 +226,7 @@ This will install all required PHP packages (Illuminate Container, Symfony Conso
 sudo berkan install
 ```
 
-This is an interactive installer that will guide you through the setup:
+This is an interactive installer that will guide you through the setup. It automatically checks for Homebrew, PHP, and Composer — installing any that are missing.
 
 **1. Web Server Selection:**
 ```
@@ -260,9 +245,16 @@ Which PHP versions would you like to install? (comma-separated, e.g. 0,1)
   [1] 8.3
   [2] 8.2
   [3] 8.1
-> 0,1
+  [4] 8.0
+  [5] 7.4
+  [6] 7.3
+  [7] 7.2
+  [8] 7.1
+  [9] 7.0
+  [10] 5.6
+> 0,1,5
 ```
-Select one or more PHP versions. The latest version you select will be set as the active version.
+Select one or more PHP versions. The latest version you select will be set as the active version. Older versions (5.6–8.0) are installed via the `shivammathur/php` Homebrew tap (added automatically).
 
 **3. Database Selection (multi-select):**
 ```
@@ -275,6 +267,22 @@ Which databases would you like to install? (comma-separated, or "none")
 > 0,3
 ```
 Select the databases you need, or choose "None" to skip. You can always install databases later with `berkan db:install`.
+
+**4. Port Configuration (automatic):**
+
+If ports 80 or 443 are already in use by another process, Berkan will detect the conflict and offer alternative ports:
+```
+⚠ Port 80 is currently in use by another process.
+⚠ Port 443 is currently in use by another process.
+
+Which ports would you like to use?
+  [0] Default (80/443) - stop conflicting services manually
+  [1] 8080/8443
+  [2] 8888/8843
+  [3] Custom
+> 1
+```
+If no conflict is detected, Berkan silently uses the default ports 80/443. Custom ports are saved in `config.json` and all server configurations are automatically updated.
 
 ### Step 4: Trust Berkan (Recommended)
 
@@ -318,25 +326,53 @@ cd ~/Sites
 berkan park
 ```
 
+Berkan will scan the directory, detect each project's framework, and interactively ask which PHP version to use for each project:
+
+```
+Found 3 projects in [/Users/you/Sites]:
+
+  blog [WordPress] — PHP version?
+    [0] Default (global PHP)
+    [1] 8.4
+    [2] 7.4
+  > 2
+
+  myapp [Laravel] — PHP version?
+    [0] Default (global PHP)
+    [1] 8.4
+  > 0
+
+  legacy-api [PHP (Composer)] — PHP version?
+    [0] Default (global PHP)
+    [1] 8.4
+    [2] 7.4
+  > 2
+```
+
+Projects assigned a specific PHP version will be isolated with their own PHP-FPM pool and socket. Projects set to "Default" will use the globally linked PHP version.
+
 Now any folder you create inside `~/Sites/` will automatically be accessible as `http://folder-name.test` in your browser.
 
 ### What `berkan install` Does (Step by Step)
 
-1. Asks you to choose a web server (Apache or Nginx), PHP versions, and databases
-2. Creates the configuration directory at `~/.config/berkan/`
-3. Creates subdirectories: `Apache/` or `Nginx/`, `Certificates/`, `Drivers/`, `Sites/`, `Log/`, `dnsmasq.d/`
-4. Saves your choices to `~/.config/berkan/config.json`
-5. Installs the chosen web server via Homebrew (if not already installed)
-6. Writes the main server configuration (`httpd.conf` for Apache or `nginx.conf` for Nginx)
-7. Creates the default catch-all server configuration (routes all `.test` requests to `server.php`)
-8. Configures PHP-FPM with a `berkan` pool using Unix socket (`~/.config/berkan/berkan.sock`)
-9. Installs additional PHP versions you selected via Homebrew
-10. Installs and configures DnsMasq to resolve all `*.test` domains to `127.0.0.1`
-11. Creates macOS resolver file at `/etc/resolver/test`
-12. Installs and starts selected databases via Homebrew
-13. Starts all services (`brew services start`)
-14. Symlinks the `berkan` executable to `/usr/local/bin/berkan`
-15. Copies a sample custom driver to `~/.config/berkan/Drivers/`
+1. **Checks for Homebrew** — if not installed, runs the official Homebrew installer automatically
+2. **Checks for Composer** — if not installed, installs it via Homebrew
+3. Asks you to choose a web server (Apache or Nginx), PHP versions, and databases
+4. **Detects port conflicts** on 80/443 and lets you choose alternative ports if needed
+5. Creates the configuration directory at `~/.config/berkan/`
+6. Creates subdirectories: `Apache/` or `Nginx/`, `Certificates/`, `Drivers/`, `Sites/`, `Log/`, `dnsmasq.d/`
+7. Saves your choices (including port configuration) to `~/.config/berkan/config.json`
+8. Installs the chosen web server via Homebrew (if not already installed)
+9. Writes the main server configuration (`httpd.conf` for Apache or `nginx.conf` for Nginx) with configured ports
+10. Creates the default catch-all server configuration (routes all `.test` requests to `server.php`)
+11. Configures PHP-FPM with a `berkan` pool using Unix socket (`~/.config/berkan/berkan.sock`)
+12. Installs additional PHP versions you selected via Homebrew (adds `shivammathur/php` tap for older versions)
+13. Installs and configures DnsMasq to resolve all `*.test` domains to `127.0.0.1`
+14. Creates macOS resolver file at `/etc/resolver/test`
+15. Installs and starts selected databases via Homebrew
+16. Starts all services (`brew services start`)
+17. Symlinks the `berkan` executable to `/usr/local/bin/berkan`
+18. Copies a sample custom driver to `~/.config/berkan/Drivers/`
 
 ### Updating Berkan
 
@@ -350,10 +386,10 @@ sudo berkan restart
 ## Quick Start
 
 ```bash
-# 1. Install Berkan (interactive)
+# 1. Install Berkan (interactive — choose web server, PHP versions, databases)
 sudo berkan install
 
-# 2. Park your projects directory
+# 2. Park your projects directory (interactive — scans projects, asks PHP version per project)
 cd ~/Sites
 berkan park
 
@@ -368,9 +404,16 @@ sudo berkan secure myapp
 
 # 6. Visit with HTTPS
 # https://myapp.test
+
+# 7. Install an older PHP version for a legacy project
+sudo berkan php:install 7.4
+
+# 8. Isolate a legacy site to PHP 7.4
+cd ~/Sites/legacy-app
+berkan isolate 7.4
 ```
 
-That's it. Every folder inside `~/Sites/` is now automatically available as `http://folder-name.test`.
+That's it. Every folder inside `~/Sites/` is now automatically available as `http://folder-name.test`. Legacy projects can run older PHP versions side by side with modern ones.
 
 ## Commands Reference
 
@@ -391,7 +434,7 @@ That's it. Every folder inside `~/Sites/` is now automatically available as `htt
 
 | Command | Description |
 |---------|-------------|
-| `berkan park [path]` | Register directory as a parked path (default: current dir) |
+| `berkan park [path]` | Register directory as a parked path with interactive project scanning and per-project PHP version selection |
 | `berkan parked` | List all parked directories |
 | `berkan forget [path]` | Remove a parked path |
 | `berkan link [name]` | Create a symbolic link for the current directory |
@@ -481,16 +524,35 @@ Berkan supports two ways to serve your PHP projects:
 
 ### The `park` Command
 
-The `park` command registers a directory. Every subdirectory within a parked directory becomes automatically accessible as a `.test` site.
+The `park` command registers a directory and interactively scans it for projects. Every subdirectory within a parked directory becomes automatically accessible as a `.test` site.
 
 ```bash
 cd ~/Sites
 berkan park
+```
 
-# Now:
-# ~/Sites/blog       -> http://blog.test
-# ~/Sites/myapp      -> http://myapp.test
-# ~/Sites/api        -> http://api.test
+Berkan will scan the directory, detect each project's framework (Laravel, Symfony, WordPress, Drupal, Magento 2, Craft CMS, Joomla, Composer, Plain PHP, etc.), and ask which PHP version to assign:
+
+```
+Found 3 projects in [/Users/you/Sites]:
+
+  blog [WordPress] — PHP version?
+  > 7.4
+
+  myapp [Laravel] — PHP version?
+  > Default (global PHP)
+
+  api [Symfony] — PHP version?
+  > 8.3
+```
+
+Each project assigned a specific PHP version gets an isolated PHP-FPM pool with its own socket (e.g., `berkan-7.4.sock`). This means different projects can run entirely different PHP versions simultaneously.
+
+```
+# Result:
+# ~/Sites/blog       -> http://blog.test       (PHP 7.4)
+# ~/Sites/myapp      -> http://myapp.test      (global PHP)
+# ~/Sites/api        -> http://api.test        (PHP 8.3)
 ```
 
 You can park multiple directories:
@@ -592,14 +654,32 @@ berkan secured
 
 ## PHP Version Management
 
+Berkan supports PHP versions from **5.6 to 8.4**. Versions 8.1–8.4 are available from the standard Homebrew formula. Older versions (5.6–8.0) are provided by the `shivammathur/php` tap, which Berkan adds automatically when needed.
+
+### Supported PHP Versions
+
+| Version | Source | Formula |
+|---------|--------|---------|
+| PHP 8.4 | Homebrew | `php` or `php@8.4` |
+| PHP 8.3 | Homebrew | `php@8.3` |
+| PHP 8.2 | Homebrew | `php@8.2` |
+| PHP 8.1 | Homebrew | `php@8.1` |
+| PHP 8.0 | shivammathur/php | `php@8.0` |
+| PHP 7.4 | shivammathur/php | `php@7.4` |
+| PHP 7.3 | shivammathur/php | `php@7.3` |
+| PHP 7.2 | shivammathur/php | `php@7.2` |
+| PHP 7.1 | shivammathur/php | `php@7.1` |
+| PHP 7.0 | shivammathur/php | `php@7.0` |
+| PHP 5.6 | shivammathur/php | `php@5.6` |
+
 ### Global PHP Switching
 
 ```bash
 # Switch to PHP 8.3
 sudo berkan use 8.3
 
-# Switch to PHP 8.2
-sudo berkan use 8.2
+# Switch to PHP 7.4
+sudo berkan use 7.4
 
 # Check current version
 berkan which-php
@@ -609,8 +689,12 @@ berkan which-php
 ### Installing and Removing PHP Versions
 
 ```bash
-# Install a new PHP version
+# Install a modern PHP version
 sudo berkan php:install 8.2
+
+# Install a legacy PHP version (shivammathur/php tap is added automatically)
+sudo berkan php:install 7.4
+sudo berkan php:install 5.6
 
 # Remove a PHP version (cannot remove the active version)
 sudo berkan php:remove 8.1
@@ -624,34 +708,41 @@ berkan php:list
 # +-------------+---------+--------+
 # | php@8.4     | Running | Yes    |
 # | php@8.3     | Stopped |        |
-# | php@8.2     | Stopped |        |
+# | php@7.4     | Running |        |
+# | php@5.6     | Running |        |
 # +-------------+---------+--------+
 ```
 
 ### Per-Site PHP Isolation
 
-You can isolate individual sites to use different PHP versions:
+You can isolate individual sites to use different PHP versions. Each isolated site gets its own PHP-FPM pool and socket:
 
 ```bash
 cd ~/Sites/legacy-app
-berkan isolate 8.1
+berkan isolate 7.4
+# Creates berkan-7.4.sock and isolated PHP-FPM pool
 
 cd ~/Sites/modern-app
 berkan isolate 8.4
+# Creates berkan-8.4.sock and isolated PHP-FPM pool
 
 # List isolated sites
 berkan isolated
 # +------------+-------------+
 # | Site       | PHP Version |
 # +------------+-------------+
-# | legacy-app | 8.1         |
-# | modern-app | 8.4         |
+# | legacy-app | php@7.4     |
+# | modern-app | php@8.4     |
 # +------------+-------------+
 
 # Remove isolation
 cd ~/Sites/legacy-app
 berkan unisolate
 ```
+
+### Per-Project PHP via `berkan park`
+
+When you run `berkan park`, Berkan scans the directory and lets you assign PHP versions per project interactively. See [The `park` Command](#the-park-command) for details.
 
 ### Using PHP CLI
 
@@ -946,13 +1037,19 @@ The main configuration file is at `~/.config/berkan/config.json`:
 {
     "tld": "test",
     "loopback": "127.0.0.1",
+    "http_port": "80",
+    "https_port": "443",
     "paths": [
         "/Users/you/Sites",
         "/Users/you/Projects"
     ],
     "web_server": "apache",
-    "php_versions": ["8.4", "8.3"],
-    "databases": ["mysql", "redis"]
+    "php_versions": ["8.4", "8.3", "7.4"],
+    "databases": ["mysql", "redis"],
+    "isolated_versions": {
+        "legacy-app": "php@7.4",
+        "old-wordpress": "php@5.6"
+    }
 }
 ```
 
@@ -960,10 +1057,13 @@ The main configuration file is at `~/.config/berkan/config.json`:
 |-----|-------------|---------|
 | `tld` | Top-level domain for sites | `test` |
 | `loopback` | Loopback IP address | `127.0.0.1` |
+| `http_port` | HTTP port for the web server | `80` |
+| `https_port` | HTTPS port for the web server | `443` |
 | `paths` | Parked directories | `[]` |
 | `web_server` | Active web server (`apache` or `nginx`) | `apache` |
 | `php_versions` | Installed PHP versions | `["8.4"]` |
 | `databases` | Installed databases | `[]` |
+| `isolated_versions` | Per-site PHP version assignments | `{}` |
 
 ### Configuration Directories
 
@@ -977,7 +1077,8 @@ The main configuration file is at `~/.config/berkan/config.json`:
 | `~/.config/berkan/Sites/` | Symbolic links for linked sites |
 | `~/.config/berkan/Log/` | Web server, PHP, and PHP-FPM logs |
 | `~/.config/berkan/dnsmasq.d/` | DnsMasq TLD configuration |
-| `~/.config/berkan/berkan.sock` | PHP-FPM Unix socket |
+| `~/.config/berkan/berkan.sock` | PHP-FPM Unix socket (global/default) |
+| `~/.config/berkan/berkan-7.4.sock` | Isolated PHP-FPM socket (example: PHP 7.4) |
 
 ### System Files
 
@@ -1111,7 +1212,7 @@ server/
 ├── composer.json              # Dependencies
 ├── cli/
 │   ├── berkan.php            # CLI entry point & container setup
-│   ├── app.php               # 47+ command definitions
+│   ├── app.php               # 48 command definitions
 │   ├── includes/
 │   │   └── helpers.php       # Helper functions
 │   ├── stubs/                # Configuration templates
@@ -1127,6 +1228,7 @@ server/
 │   │   ├── nginx-secure.berkan.conf # Nginx HTTPS server
 │   │   ├── nginx-proxy.berkan.conf  # Nginx proxy server
 │   │   ├── nginx-secure.proxy.berkan.conf # Nginx secure proxy
+│   │   ├── etc-phpfpm-berkan-isolated.conf # Isolated PHP-FPM pool template
 │   │   └── ...               # More templates
 │   ├── templates/
 │   │   └── 404.html          # Custom 404 page
@@ -1135,16 +1237,22 @@ server/
 │       │   └── WebServer.php  # WebServer interface
 │       ├── Apache.php         # Apache management (implements WebServer)
 │       ├── Nginx.php          # Nginx management (implements WebServer)
-│       ├── Database.php       # Database management
 │       ├── Berkan.php         # Main class
 │       ├── Brew.php           # Homebrew integration
+│       ├── CommandLine.php    # Shell command execution
+│       ├── Composer.php       # Composer package management
 │       ├── Configuration.php  # Config management
-│       ├── DnsMasq.php        # DNS management
-│       ├── PhpFpm.php         # PHP-FPM management
-│       ├── Site.php           # Site & SSL management
-│       ├── Server.php         # Request routing
-│       ├── Status.php         # Health checks
+│       ├── Database.php       # Database management
 │       ├── Diagnose.php       # Diagnostics
+│       ├── DnsMasq.php        # DNS management
+│       ├── Filesystem.php     # File operations
+│       ├── PhpFpm.php         # PHP-FPM management
+│       ├── Server.php         # Request routing
+│       ├── Site.php           # Site & SSL management
+│       ├── Status.php         # Health checks
+│       ├── Ngrok.php          # Ngrok tunnel sharing
+│       ├── Expose.php         # Expose tunnel sharing
+│       ├── Cloudflared.php    # Cloudflare tunnel sharing
 │       └── Drivers/           # Framework drivers
 │           ├── BerkanDriver.php
 │           ├── LaravelBerkanDriver.php
@@ -1180,6 +1288,24 @@ sudo lsof -i :80
 berkan log nginx
 ```
 
+### Port conflicts
+
+If ports 80/443 are occupied by another service, you have two options:
+
+1. **Use custom ports** - Run `berkan install` again and select alternative ports (e.g., 8080/8443). The ports are stored in `config.json` and all server configurations are updated automatically.
+
+2. **Free the default ports** - Stop the conflicting service:
+   ```bash
+   # Find what's using port 80
+   sudo lsof -i :80
+
+   # Stop macOS built-in Apache if it's running
+   sudo apachectl stop
+   sudo launchctl unload -w /System/Library/LaunchDaemons/org.apache.httpd.plist 2>/dev/null
+   ```
+
+When using custom ports, access your sites with the port number: `http://myapp.test:8080` or `https://myapp.test:8443`.
+
 ### Sites not resolving
 
 ```bash
@@ -1200,11 +1326,17 @@ sudo killall -HUP mDNSResponder
 ### PHP-FPM socket not found
 
 ```bash
-# Check if socket exists
+# Check if default socket exists
 ls -la ~/.config/berkan/berkan.sock
+
+# Check isolated sockets (e.g., PHP 7.4)
+ls -la ~/.config/berkan/berkan-7.4.sock
 
 # Restart PHP-FPM
 sudo brew services restart php
+
+# Restart a specific isolated PHP-FPM
+sudo brew services restart php@7.4
 
 # Check PHP-FPM log
 berkan log php-fpm
@@ -1312,6 +1444,7 @@ Berkan, kurulum sırasında **Apache** veya **Nginx** arasında seçim yapmanız
 ### Site Sunma
 
 - **Sıfır konfigürasyon** - bir dizini park edin, her alt klasör anında `.test` sitesi olur
+- **İnteraktif park** - `berkan park` projeleri tarar, framework algılar ve proje bazında PHP versiyonu seçmenizi sağlar
 - Dizinleri toplu **park** edin: `~/Sites/blog` otomatik olarak `http://blog.test` olur
 - Diskteki herhangi bir konumdan projeleri özel isimlerle **link**'leyin
 - Driver sistemi ile **otomatik framework algılama** (25'ten fazla yerleşik driver)
@@ -1330,10 +1463,14 @@ Berkan, kurulum sırasında **Apache** veya **Nginx** arasında seçim yapmanız
 
 ### PHP Yönetimi
 
-- PHP 8.1, 8.2, 8.3, 8.4 arasında **global PHP versiyon değiştirme**
+- **Geniş PHP versiyon desteği**: PHP 5.6, 7.0–7.4, 8.0–8.4 — `shivammathur/php` tap ile eski versiyonlar desteklenir
+- Kurulu herhangi bir PHP versiyonu arasında **global PHP versiyon değiştirme**
 - `berkan php:install` / `berkan php:remove` ile istediğiniz zaman **PHP versiyonu kur/kaldır**
 - `berkan php:list` ile **kurulu PHP versiyonlarını listele**
 - **Site bazlı PHP izolasyonu** - farklı siteler arasında farklı PHP versiyonları çalıştırabilir
+- **`berkan park` ile proje bazlı PHP seçimi** - interaktif proje tarama, otomatik framework algılama ve PHP versiyon atama
+- **İzole PHP-FPM havuzları** - her izole versiyon kendi soketini alır (`berkan-7.4.sock`, `berkan-8.1.sock`, vb.)
+- **Park sırasında otomatik framework algılama**: Laravel, Symfony, WordPress, Drupal, Magento 2, Craft CMS, Joomla, Composer projeleri, Plain PHP
 - `berkan php` - Berkan'ın yönettiği versiyonla PHP CLI çalıştırma
 - `berkan composer` - doğru PHP binary'si ile Composer çalıştırma
 - Unix soket (`berkan.sock`) ile otomatik **PHP-FPM havuz yapılandırması**
@@ -1397,42 +1534,22 @@ Berkan, kurulum sırasında **Apache** veya **Nginx** arasında seçim yapmanız
 ## Gereksinimler
 
 - **macOS** (Apple Silicon veya Intel)
-- **[Homebrew](https://brew.sh)** kurulu olmalıdır
-- **PHP 8.1+** (Homebrew ile kurulu)
-- Port 80/443 başka bir web sunucu tarafından kullanılmıyor olmalıdır
+- **Homebrew**, **PHP** ve **Composer** kurulu değilse `berkan install` tarafından **otomatik olarak kurulur**
+- Port 80/443 varsayılan olarak kullanılır, ancak bu portlar doluysa kurulum sırasında **özel portlar** seçilebilir
 
 ## Kurulum
 
 ### Ön Gereksinimler
 
-Berkan'ı kurmadan önce aşağıdakilerin yüklü olduğundan emin olun:
+Berkan'ı kurmadan önce sadece şunlara ihtiyacınız var:
 
 1. **macOS** (Apple Silicon veya Intel)
 
-2. **Homebrew** - Eğer Homebrew kurulu değilse önce kurun:
-   ```bash
-   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   ```
-
-3. **PHP 8.1+** - Homebrew ile PHP kurun (kurulu değilse):
-   ```bash
-   brew install php
-   ```
-
-4. **Composer** - PHP bağımlılık yöneticisini kurun:
-   ```bash
-   brew install composer
-   ```
-
-5. **Port 80 ve 443 boş olmalıdır** - Başka bir web sunucunun (Apache, Nginx, MAMP, XAMPP, vb.) bu portları kullanmadığından emin olun:
-   ```bash
-   # Port 80'i kullanan bir şey var mı kontrol edin
-   sudo lsof -i :80
-
-   # macOS'un dahili Apache'si çalışıyorsa durdurun
-   sudo apachectl stop
-   sudo launchctl unload -w /System/Library/LaunchDaemons/org.apache.httpd.plist 2>/dev/null
-   ```
+Hepsi bu kadar! `berkan install` komutu otomatik olarak:
+- **Homebrew** kurulu değilse kurar
+- Homebrew ile **PHP** kurar
+- **Composer** kurulu değilse kurar
+- Port 80/443 üzerinde **çakışma varsa algılar** ve alternatif port seçmenizi sağlar
 
 ### Adım 1: Depoyu Klonlayın
 
@@ -1455,7 +1572,7 @@ Bu komut gerekli tüm PHP paketlerini (Illuminate Container, Symfony Console, Gu
 sudo berkan install
 ```
 
-Bu, sizi kurulum boyunca yönlendirecek interaktif bir kurucu başlatır:
+Bu, sizi kurulum boyunca yönlendirecek interaktif bir kurucu başlatır. Homebrew, PHP ve Composer'ı otomatik kontrol eder — eksik olanları kurar.
 
 **1. Web Sunucu Seçimi:**
 ```
@@ -1474,9 +1591,16 @@ Which PHP versions would you like to install? (comma-separated, e.g. 0,1)
   [1] 8.3
   [2] 8.2
   [3] 8.1
-> 0,1
+  [4] 8.0
+  [5] 7.4
+  [6] 7.3
+  [7] 7.2
+  [8] 7.1
+  [9] 7.0
+  [10] 5.6
+> 0,1,5
 ```
-Bir veya daha fazla PHP versiyonu seçin. Seçtiğiniz en son versiyon aktif versiyon olarak ayarlanacaktır.
+Bir veya daha fazla PHP versiyonu seçin. Seçtiğiniz en son versiyon aktif versiyon olarak ayarlanacaktır. Eski versiyonlar (5.6–8.0) `shivammathur/php` Homebrew tap'ı ile kurulur (otomatik eklenir).
 
 **3. Veritabanı Seçimi (çoklu seçim):**
 ```
@@ -1489,6 +1613,22 @@ Which databases would you like to install? (comma-separated, or "none")
 > 0,3
 ```
 İhtiyacınız olan veritabanlarını seçin veya atlamak için "None" seçin. Veritabanlarını daha sonra `berkan db:install` ile istediğiniz zaman kurabilirsiniz.
+
+**4. Port Yapılandırması (otomatik):**
+
+Port 80 veya 443 başka bir işlem tarafından kullanılıyorsa Berkan çakışmayı algılar ve alternatif portlar sunar:
+```
+⚠ Port 80 is currently in use by another process.
+⚠ Port 443 is currently in use by another process.
+
+Which ports would you like to use?
+  [0] Default (80/443) - stop conflicting services manually
+  [1] 8080/8443
+  [2] 8888/8843
+  [3] Custom
+> 1
+```
+Çakışma yoksa Berkan sessizce varsayılan 80/443 portlarını kullanır. Özel portlar `config.json`'a kaydedilir ve tüm sunucu konfigürasyonları otomatik güncellenir.
 
 ### Adım 4: Berkan'ı Güvenilir Yapın (Önerilen)
 
@@ -1532,25 +1672,53 @@ cd ~/Sites
 berkan park
 ```
 
+Berkan dizini tarayacak, her projenin framework'ünü algılayacak ve her proje için hangi PHP versiyonunun kullanılacağını interaktif olarak soracaktır:
+
+```
+Found 3 projects in [/Users/siz/Sites]:
+
+  blog [WordPress] — PHP version?
+    [0] Default (global PHP)
+    [1] 8.4
+    [2] 7.4
+  > 2
+
+  myapp [Laravel] — PHP version?
+    [0] Default (global PHP)
+    [1] 8.4
+  > 0
+
+  eski-api [PHP (Composer)] — PHP version?
+    [0] Default (global PHP)
+    [1] 8.4
+    [2] 7.4
+  > 2
+```
+
+Belirli bir PHP versiyonu atanan projeler kendi PHP-FPM havuzu ve soketi ile izole edilir. "Default" seçilen projeler global PHP versiyonunu kullanır.
+
 Artık `~/Sites/` içinde oluşturduğunuz her klasör tarayıcınızda otomatik olarak `http://klasör-adı.test` olarak erişilebilir olacaktır.
 
 ### `berkan install` Ne Yapar? (Adım Adım)
 
-1. Web sunucu (Apache veya Nginx), PHP versiyonları ve veritabanları seçmenizi ister
-2. `~/.config/berkan/` konfigürasyon dizinini oluşturur
-3. Alt dizinleri oluşturur: `Apache/` veya `Nginx/`, `Certificates/`, `Drivers/`, `Sites/`, `Log/`, `dnsmasq.d/`
-4. Seçimlerinizi `~/.config/berkan/config.json` dosyasına kaydeder
-5. Seçilen web sunucuyu Homebrew ile kurar (kurulu değilse)
-6. Ana sunucu konfigürasyonunu yazar (Apache için `httpd.conf` veya Nginx için `nginx.conf`)
-7. Varsayılan catch-all sunucu konfigürasyonunu oluşturur (tüm `.test` isteklerini `server.php`'ye yönlendirir)
-8. PHP-FPM'i Unix socket kullanan bir `berkan` havuzuyla yapılandırır (`~/.config/berkan/berkan.sock`)
-9. Seçtiğiniz ek PHP versiyonlarını Homebrew ile kurar
-10. DnsMasq'i tüm `*.test` alan adlarını `127.0.0.1`'e çözümlemek için kurar ve yapılandırır
-11. `/etc/resolver/test` macOS resolver dosyasını oluşturur
-12. Seçilen veritabanlarını Homebrew ile kurar ve başlatır
-13. Tüm servisleri başlatır (`brew services start`)
-14. `berkan` çalıştırılabilir dosyasını `/usr/local/bin/berkan` olarak symlink'ler
-15. Örnek bir özel driver'ı `~/.config/berkan/Drivers/` dizinine kopyalar
+1. **Homebrew kontrolü** — kurulu değilse resmi Homebrew kurucusunu otomatik çalıştırır
+2. **Composer kontrolü** — kurulu değilse Homebrew ile kurar
+3. Web sunucu (Apache veya Nginx), PHP versiyonları ve veritabanları seçmenizi ister
+4. **Port çakışmalarını algılar** (80/443) ve gerekirse alternatif port seçmenizi sağlar
+5. `~/.config/berkan/` konfigürasyon dizinini oluşturur
+6. Alt dizinleri oluşturur: `Apache/` veya `Nginx/`, `Certificates/`, `Drivers/`, `Sites/`, `Log/`, `dnsmasq.d/`
+7. Seçimlerinizi (port yapılandırması dahil) `~/.config/berkan/config.json` dosyasına kaydeder
+8. Seçilen web sunucuyu Homebrew ile kurar (kurulu değilse)
+9. Ana sunucu konfigürasyonunu yapılandırılmış portlarla yazar (Apache için `httpd.conf` veya Nginx için `nginx.conf`)
+10. Varsayılan catch-all sunucu konfigürasyonunu oluşturur (tüm `.test` isteklerini `server.php`'ye yönlendirir)
+11. PHP-FPM'i Unix socket kullanan bir `berkan` havuzuyla yapılandırır (`~/.config/berkan/berkan.sock`)
+12. Seçtiğiniz ek PHP versiyonlarını Homebrew ile kurar (eski versiyonlar için `shivammathur/php` tap eklenir)
+13. DnsMasq'i tüm `*.test` alan adlarını `127.0.0.1`'e çözümlemek için kurar ve yapılandırır
+14. `/etc/resolver/test` macOS resolver dosyasını oluşturur
+15. Seçilen veritabanlarını Homebrew ile kurar ve başlatır
+16. Tüm servisleri başlatır (`brew services start`)
+17. `berkan` çalıştırılabilir dosyasını `/usr/local/bin/berkan` olarak symlink'ler
+18. Örnek bir özel driver'ı `~/.config/berkan/Drivers/` dizinine kopyalar
 
 ### Berkan'ı Güncelleme
 
@@ -1564,10 +1732,10 @@ sudo berkan restart
 ## Hızlı Başlangıç
 
 ```bash
-# 1. Berkan'ı kurun (interaktif)
+# 1. Berkan'ı kurun (interaktif — web sunucu, PHP versiyonları, veritabanları seçin)
 sudo berkan install
 
-# 2. Projeler dizininizi park edin
+# 2. Projeler dizininizi park edin (interaktif — projeleri tarar, proje başına PHP versiyonu sorar)
 cd ~/Sites
 berkan park
 
@@ -1582,9 +1750,16 @@ sudo berkan secure myapp
 
 # 6. HTTPS ile ziyaret edin
 # https://myapp.test
+
+# 7. Eski bir proje için eski PHP versiyonu kurun
+sudo berkan php:install 7.4
+
+# 8. Eski siteyi PHP 7.4'e izole edin
+cd ~/Sites/eski-uygulama
+berkan isolate 7.4
 ```
 
-Bu kadar! `~/Sites/` içindeki her klasör artık otomatik olarak `http://klasor-adi.test` adresinde erişime açıktır.
+Bu kadar! `~/Sites/` içindeki her klasör artık otomatik olarak `http://klasor-adi.test` adresinde erişime açıktır. Eski projeler modern projelerle yan yana farklı PHP versiyonları çalıştırabilir.
 
 ## Komut Referansı
 
@@ -1605,7 +1780,7 @@ Bu kadar! `~/Sites/` içindeki her klasör artık otomatik olarak `http://klasor
 
 | Komut | Açıklama |
 |-------|----------|
-| `berkan park [yol]` | Dizini park edilmiş yol olarak kaydet (varsayılan: mevcut dizin) |
+| `berkan park [yol]` | Dizini interaktif proje tarama ve proje başına PHP versiyon seçimiyle park et |
 | `berkan parked` | Tüm park edilmiş dizinleri listele |
 | `berkan forget [yol]` | Park edilmiş yolu kaldır |
 | `berkan link [isim]` | Mevcut dizin için sembolik bağlantı oluştur |
@@ -1695,16 +1870,35 @@ Berkan, PHP projelerinizi sunmak için iki yol destekler:
 
 ### `park` Komutu
 
-`park` komutu bir dizini kaydeder. Park edilmiş dizin içindeki her alt klasör otomatik olarak `.test` sitesi olarak erişilebilir hale gelir.
+`park` komutu bir dizini kaydeder ve interaktif olarak projeleri tarar. Park edilmiş dizin içindeki her alt klasör otomatik olarak `.test` sitesi olarak erişilebilir hale gelir.
 
 ```bash
 cd ~/Sites
 berkan park
+```
 
-# Artık:
-# ~/Sites/blog       -> http://blog.test
-# ~/Sites/myapp      -> http://myapp.test
-# ~/Sites/api        -> http://api.test
+Berkan dizini tarayacak, her projenin framework'ünü algılayacak (Laravel, Symfony, WordPress, Drupal, Magento 2, Craft CMS, Joomla, Composer, Plain PHP, vb.) ve hangi PHP versiyonunun atanacağını soracaktır:
+
+```
+Found 3 projects in [/Users/siz/Sites]:
+
+  blog [WordPress] — PHP version?
+  > 7.4
+
+  myapp [Laravel] — PHP version?
+  > Default (global PHP)
+
+  api [Symfony] — PHP version?
+  > 8.3
+```
+
+Belirli bir PHP versiyonu atanan her proje, kendi soketi ile izole bir PHP-FPM havuzu alır (ör. `berkan-7.4.sock`). Bu sayede farklı projeler tamamen farklı PHP versiyonlarını aynı anda çalıştırabilir.
+
+```
+# Sonuç:
+# ~/Sites/blog       -> http://blog.test       (PHP 7.4)
+# ~/Sites/myapp      -> http://myapp.test      (global PHP)
+# ~/Sites/api        -> http://api.test        (PHP 8.3)
 ```
 
 Birden fazla dizin park edebilirsiniz:
@@ -1806,14 +2000,32 @@ berkan secured
 
 ## PHP Versiyon Yönetimi
 
+Berkan, **PHP 5.6'dan 8.4'e** kadar tüm versiyonları destekler. 8.1–8.4 versiyonları standart Homebrew formülünden gelir. Eski versiyonlar (5.6–8.0) `shivammathur/php` tap'ı tarafından sağlanır ve gerektiğinde Berkan otomatik olarak ekler.
+
+### Desteklenen PHP Versiyonları
+
+| Versiyon | Kaynak | Formül |
+|----------|--------|--------|
+| PHP 8.4 | Homebrew | `php` veya `php@8.4` |
+| PHP 8.3 | Homebrew | `php@8.3` |
+| PHP 8.2 | Homebrew | `php@8.2` |
+| PHP 8.1 | Homebrew | `php@8.1` |
+| PHP 8.0 | shivammathur/php | `php@8.0` |
+| PHP 7.4 | shivammathur/php | `php@7.4` |
+| PHP 7.3 | shivammathur/php | `php@7.3` |
+| PHP 7.2 | shivammathur/php | `php@7.2` |
+| PHP 7.1 | shivammathur/php | `php@7.1` |
+| PHP 7.0 | shivammathur/php | `php@7.0` |
+| PHP 5.6 | shivammathur/php | `php@5.6` |
+
 ### Global PHP Değiştirme
 
 ```bash
 # PHP 8.3'e geç
 sudo berkan use 8.3
 
-# PHP 8.2'ye geç
-sudo berkan use 8.2
+# PHP 7.4'e geç
+sudo berkan use 7.4
 
 # Mevcut versiyonu kontrol et
 berkan which-php
@@ -1823,8 +2035,12 @@ berkan which-php
 ### PHP Versiyonlarını Kurma ve Kaldırma
 
 ```bash
-# Yeni PHP versiyonu kur
+# Modern PHP versiyonu kur
 sudo berkan php:install 8.2
+
+# Eski PHP versiyonu kur (shivammathur/php tap'ı otomatik eklenir)
+sudo berkan php:install 7.4
+sudo berkan php:install 5.6
 
 # PHP versiyonu kaldır (aktif versiyon kaldırılamaz)
 sudo berkan php:remove 8.1
@@ -1838,34 +2054,41 @@ berkan php:list
 # +-------------+---------+--------+
 # | php@8.4     | Running | Yes    |
 # | php@8.3     | Stopped |        |
-# | php@8.2     | Stopped |        |
+# | php@7.4     | Running |        |
+# | php@5.6     | Running |        |
 # +-------------+---------+--------+
 ```
 
 ### Site Bazında PHP İzolasyonu
 
-Tek tek siteleri farklı PHP versiyonları kullanacak şekilde izole edebilirsiniz:
+Tek tek siteleri farklı PHP versiyonları kullanacak şekilde izole edebilirsiniz. Her izole site kendi PHP-FPM havuzu ve soketini alır:
 
 ```bash
 cd ~/Sites/eski-uygulama
-berkan isolate 8.1
+berkan isolate 7.4
+# berkan-7.4.sock ve izole PHP-FPM havuzu oluşturulur
 
 cd ~/Sites/modern-uygulama
 berkan isolate 8.4
+# berkan-8.4.sock ve izole PHP-FPM havuzu oluşturulur
 
 # İzole edilmiş siteleri listele
 berkan isolated
 # +------------------+-------------+
 # | Site             | PHP Version |
 # +------------------+-------------+
-# | eski-uygulama    | 8.1         |
-# | modern-uygulama  | 8.4         |
+# | eski-uygulama    | php@7.4     |
+# | modern-uygulama  | php@8.4     |
 # +------------------+-------------+
 
 # İzolasyonu kaldır
 cd ~/Sites/eski-uygulama
 berkan unisolate
 ```
+
+### `berkan park` ile Proje Bazında PHP
+
+`berkan park` çalıştırdığınızda, Berkan dizini tarar ve proje başına PHP versiyonunu interaktif olarak atamanızı sağlar. Detaylar için [`park` Komutu](#park-komutu) bölümüne bakın.
 
 ### PHP CLI Kullanımı
 
@@ -2160,13 +2383,19 @@ Ana konfigürasyon dosyası `~/.config/berkan/config.json` adresindedir:
 {
     "tld": "test",
     "loopback": "127.0.0.1",
+    "http_port": "80",
+    "https_port": "443",
     "paths": [
         "/Users/siz/Sites",
         "/Users/siz/Projects"
     ],
     "web_server": "apache",
-    "php_versions": ["8.4", "8.3"],
-    "databases": ["mysql", "redis"]
+    "php_versions": ["8.4", "8.3", "7.4"],
+    "databases": ["mysql", "redis"],
+    "isolated_versions": {
+        "eski-proje": "php@7.4",
+        "eski-wordpress": "php@5.6"
+    }
 }
 ```
 
@@ -2174,10 +2403,13 @@ Ana konfigürasyon dosyası `~/.config/berkan/config.json` adresindedir:
 |---------|----------|------------|
 | `tld` | Siteler için üst düzey alan adı | `test` |
 | `loopback` | Loopback IP adresi | `127.0.0.1` |
+| `http_port` | Web sunucu HTTP portu | `80` |
+| `https_port` | Web sunucu HTTPS portu | `443` |
 | `paths` | Park edilmiş dizinler | `[]` |
 | `web_server` | Aktif web sunucu (`apache` veya `nginx`) | `apache` |
 | `php_versions` | Kurulu PHP versiyonları | `["8.4"]` |
 | `databases` | Kurulu veritabanları | `[]` |
+| `isolated_versions` | Site bazlı PHP versiyon atamaları | `{}` |
 
 ### Konfigürasyon Dizinleri
 
@@ -2191,7 +2423,8 @@ Ana konfigürasyon dosyası `~/.config/berkan/config.json` adresindedir:
 | `~/.config/berkan/Sites/` | Bağlantılı siteler için sembolik bağlantılar |
 | `~/.config/berkan/Log/` | Web sunucu, PHP ve PHP-FPM log'ları |
 | `~/.config/berkan/dnsmasq.d/` | DnsMasq TLD konfigürasyonu |
-| `~/.config/berkan/berkan.sock` | PHP-FPM Unix soketi |
+| `~/.config/berkan/berkan.sock` | PHP-FPM Unix soketi (global/varsayılan) |
+| `~/.config/berkan/berkan-7.4.sock` | İzole PHP-FPM soketi (örnek: PHP 7.4) |
 
 ### Sistem Dosyaları
 
@@ -2325,7 +2558,7 @@ server/
 ├── composer.json              # Bağımlılıklar
 ├── cli/
 │   ├── berkan.php            # CLI giriş noktası ve konteyner kurulumu
-│   ├── app.php               # 47'den fazla komut tanımı
+│   ├── app.php               # 48 komut tanımı
 │   ├── includes/
 │   │   └── helpers.php       # Yardımcı fonksiyonlar
 │   ├── stubs/                # Konfigürasyon şablonları
@@ -2341,6 +2574,7 @@ server/
 │   │   ├── nginx-secure.berkan.conf # Nginx HTTPS sunucu
 │   │   ├── nginx-proxy.berkan.conf  # Nginx proxy sunucu
 │   │   ├── nginx-secure.proxy.berkan.conf # Nginx güvenli proxy
+│   │   ├── etc-phpfpm-berkan-isolated.conf # İzole PHP-FPM havuz şablonu
 │   │   └── ...               # Daha fazla şablon
 │   ├── templates/
 │   │   └── 404.html          # Özel 404 sayfası
@@ -2349,16 +2583,22 @@ server/
 │       │   └── WebServer.php  # WebServer arayüzü (interface)
 │       ├── Apache.php         # Apache yönetimi (WebServer implement eder)
 │       ├── Nginx.php          # Nginx yönetimi (WebServer implement eder)
-│       ├── Database.php       # Veritabanı yönetimi
 │       ├── Berkan.php         # Ana sınıf
 │       ├── Brew.php           # Homebrew entegrasyonu
+│       ├── CommandLine.php    # Kabuk komut çalıştırma
+│       ├── Composer.php       # Composer paket yönetimi
 │       ├── Configuration.php  # Konfigürasyon yönetimi
-│       ├── DnsMasq.php        # DNS yönetimi
-│       ├── PhpFpm.php         # PHP-FPM yönetimi
-│       ├── Site.php           # Site ve SSL yönetimi
-│       ├── Server.php         # İstek yönlendirme
-│       ├── Status.php         # Sağlık kontrolleri
+│       ├── Database.php       # Veritabanı yönetimi
 │       ├── Diagnose.php       # Tanı
+│       ├── DnsMasq.php        # DNS yönetimi
+│       ├── Filesystem.php     # Dosya işlemleri
+│       ├── PhpFpm.php         # PHP-FPM yönetimi
+│       ├── Server.php         # İstek yönlendirme
+│       ├── Site.php           # Site ve SSL yönetimi
+│       ├── Status.php         # Sağlık kontrolleri
+│       ├── Ngrok.php          # Ngrok tünel paylaşımı
+│       ├── Expose.php         # Expose tünel paylaşımı
+│       ├── Cloudflared.php    # Cloudflare tünel paylaşımı
 │       └── Drivers/           # Framework driver'ları
 │           ├── BerkanDriver.php
 │           ├── LaravelBerkanDriver.php
@@ -2394,6 +2634,24 @@ sudo lsof -i :80
 berkan log nginx
 ```
 
+### Port çakışmaları
+
+Port 80/443 başka bir servis tarafından kullanılıyorsa iki seçeneğiniz var:
+
+1. **Özel portlar kullanın** - `berkan install` komutunu tekrar çalıştırın ve alternatif portlar seçin (ör. 8080/8443). Portlar `config.json`'a kaydedilir ve tüm sunucu konfigürasyonları otomatik güncellenir.
+
+2. **Varsayılan portları boşaltın** - Çakışan servisi durdurun:
+   ```bash
+   # Port 80'i ne kullanıyor?
+   sudo lsof -i :80
+
+   # macOS dahili Apache'si çalışıyorsa durdurun
+   sudo apachectl stop
+   sudo launchctl unload -w /System/Library/LaunchDaemons/org.apache.httpd.plist 2>/dev/null
+   ```
+
+Özel portlar kullanırken sitelerinize port numarasıyla erişin: `http://myapp.test:8080` veya `https://myapp.test:8443`.
+
 ### Siteler çözümlenmiyor
 
 ```bash
@@ -2414,11 +2672,17 @@ sudo killall -HUP mDNSResponder
 ### PHP-FPM soketi bulunamıyor
 
 ```bash
-# Soketin var olup olmadığını kontrol et
+# Varsayılan soketin var olup olmadığını kontrol et
 ls -la ~/.config/berkan/berkan.sock
+
+# İzole soketleri kontrol et (ör. PHP 7.4)
+ls -la ~/.config/berkan/berkan-7.4.sock
 
 # PHP-FPM'i yeniden başlat
 sudo brew services restart php
+
+# Belirli bir izole PHP-FPM'i yeniden başlat
+sudo brew services restart php@7.4
 
 # PHP-FPM logunu kontrol et
 berkan log php-fpm

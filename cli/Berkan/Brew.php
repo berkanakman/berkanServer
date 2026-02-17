@@ -13,6 +13,13 @@ class Brew
         'php@8.3',
         'php@8.2',
         'php@8.1',
+        'php@8.0',
+        'php@7.4',
+        'php@7.3',
+        'php@7.2',
+        'php@7.1',
+        'php@7.0',
+        'php@5.6',
     ];
 
     /**
@@ -77,6 +84,15 @@ class Brew
     }
 
     /**
+     * Determine if the given formula requires the shivammathur/php tap.
+     */
+    public function requiresTap(string $formula): bool
+    {
+        $oldVersions = ['php@8.0', 'php@7.4', 'php@7.3', 'php@7.2', 'php@7.1', 'php@7.0', 'php@5.6'];
+        return in_array($formula, $oldVersions);
+    }
+
+    /**
      * Ensure that the given formula is installed.
      */
     public function ensureInstalled(string $formula, array $options = [], array $taps = []): void
@@ -94,6 +110,10 @@ class Brew
     public function installOrFail(string $formula, array $options = [], array $taps = []): void
     {
         info("Installing {$formula}...");
+
+        if ($this->requiresTap($formula)) {
+            $this->tap(['shivammathur/php']);
+        }
 
         if (count($taps) > 0) {
             $this->tap($taps);
