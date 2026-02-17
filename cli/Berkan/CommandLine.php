@@ -29,15 +29,19 @@ class CommandLine
      */
     public function runAsUser(string $command, ?callable $onError = null): string
     {
-        $user = user();
-
         if (posix_getuid() === 0) {
-            $home = posix_getpwnam($user)['dir'] ?? '/Users/' . $user;
+            $user = user();
+            $process = new Process(['sudo', '-u', $user, 'bash', '-lc', $command]);
+            $process->setTimeout(null);
+            $process->run();
 
-            return $this->run(
-                'su - "' . $user . '" -c ' . escapeshellarg($command),
-                $onError
-            );
+            if ($process->getExitCode() > 0) {
+                if ($onError) {
+                    $onError($process->getExitCode(), $process->getErrorOutput());
+                }
+            }
+
+            return $process->getOutput();
         }
 
         return $this->run($command, $onError);
