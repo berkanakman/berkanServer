@@ -205,22 +205,20 @@ That's it! The `berkan install` command will automatically:
 - Install **Composer** if it's not already installed
 - Detect **port conflicts** on 80/443 and let you choose alternative ports
 
-### Step 1: Clone the Repository
+### Step 1: Install via Composer
 
 ```bash
-git clone https://github.com/berkanakman/berkanServer.git
-cd berkanServer
+composer global require berkan/server
 ```
 
-### Step 2: Install PHP Dependencies
+> **Note:** Make sure Composer's global vendor bin directory is in your `PATH`. Add one of the following to your shell profile (`~/.zshrc` or `~/.bashrc`):
+> ```bash
+> export PATH="$HOME/.composer/vendor/bin:$PATH"
+> # or on newer Composer versions:
+> export PATH="$HOME/.config/composer/vendor/bin:$PATH"
+> ```
 
-```bash
-composer install
-```
-
-This will install all required PHP packages (Illuminate Container, Symfony Console, Guzzle, etc.) into the `vendor/` directory.
-
-### Step 3: Install Berkan Services
+### Step 2: Install Berkan Services
 
 ```bash
 sudo berkan install
@@ -377,6 +375,24 @@ Now any folder you create inside `~/Sites/` will automatically be accessible as 
 ### Updating Berkan
 
 ```bash
+composer global update berkan/server
+sudo berkan restart
+```
+
+### Alternative: Manual Installation
+
+If you prefer to install from source:
+
+```bash
+git clone https://github.com/berkanakman/berkanServer.git
+cd berkanServer
+composer install
+sudo berkan install
+```
+
+To update a manual installation:
+
+```bash
 cd /path/to/berkanServer
 git pull origin main
 composer install
@@ -386,14 +402,17 @@ sudo berkan restart
 ## Quick Start
 
 ```bash
-# 1. Install Berkan (interactive — choose web server, PHP versions, databases)
+# 1. Install Berkan
+composer global require berkan/server
+
+# 2. Install services (interactive — choose web server, PHP versions, databases)
 sudo berkan install
 
-# 2. Park your projects directory (interactive — scans projects, asks PHP version per project)
+# 3. Park your projects directory (interactive — scans projects, asks PHP version per project)
 cd ~/Sites
 berkan park
 
-# 3. Create a Laravel project
+# 4. Create a Laravel project
 composer create-project laravel/laravel myapp
 
 # 4. Visit in browser
@@ -1551,22 +1570,20 @@ Hepsi bu kadar! `berkan install` komutu otomatik olarak:
 - **Composer** kurulu değilse kurar
 - Port 80/443 üzerinde **çakışma varsa algılar** ve alternatif port seçmenizi sağlar
 
-### Adım 1: Depoyu Klonlayın
+### Adım 1: Composer ile Kurun
 
 ```bash
-git clone https://github.com/berkanakman/berkanServer.git
-cd berkanServer
+composer global require berkan/server
 ```
 
-### Adım 2: PHP Bağımlılıklarını Kurun
+> **Not:** Composer'ın global vendor bin dizininin `PATH`'inizde olduğundan emin olun. Shell profilinize (`~/.zshrc` veya `~/.bashrc`) aşağıdakilerden birini ekleyin:
+> ```bash
+> export PATH="$HOME/.composer/vendor/bin:$PATH"
+> # veya yeni Composer versiyonlarında:
+> export PATH="$HOME/.config/composer/vendor/bin:$PATH"
+> ```
 
-```bash
-composer install
-```
-
-Bu komut gerekli tüm PHP paketlerini (Illuminate Container, Symfony Console, Guzzle, vb.) `vendor/` dizinine kuracaktır.
-
-### Adım 3: Berkan Servislerini Kurun
+### Adım 2: Berkan Servislerini Kurun
 
 ```bash
 sudo berkan install
@@ -1723,6 +1740,24 @@ Artık `~/Sites/` içinde oluşturduğunuz her klasör tarayıcınızda otomatik
 ### Berkan'ı Güncelleme
 
 ```bash
+composer global update berkan/server
+sudo berkan restart
+```
+
+### Alternatif: Manuel Kurulum
+
+Kaynak koddan kurmayı tercih ederseniz:
+
+```bash
+git clone https://github.com/berkanakman/berkanServer.git
+cd berkanServer
+composer install
+sudo berkan install
+```
+
+Manuel kurulumu güncellemek için:
+
+```bash
 cd /path/to/berkanServer
 git pull origin main
 composer install
@@ -1732,10 +1767,13 @@ sudo berkan restart
 ## Hızlı Başlangıç
 
 ```bash
-# 1. Berkan'ı kurun (interaktif — web sunucu, PHP versiyonları, veritabanları seçin)
+# 1. Berkan'ı kurun
+composer global require berkan/server
+
+# 2. Servisleri kurun (interaktif — web sunucu, PHP versiyonları, veritabanları seçin)
 sudo berkan install
 
-# 2. Projeler dizininizi park edin (interaktif — projeleri tarar, proje başına PHP versiyonu sorar)
+# 3. Projeler dizininizi park edin (interaktif — projeleri tarar, proje başına PHP versiyonu sorar)
 cd ~/Sites
 berkan park
 
