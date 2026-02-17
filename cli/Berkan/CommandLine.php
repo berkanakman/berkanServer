@@ -31,7 +31,16 @@ class CommandLine
     {
         $user = user();
 
-        return $this->run('sudo -iu "' . $user . '" -- ' . $command, $onError);
+        if (posix_getuid() === 0) {
+            $home = posix_getpwnam($user)['dir'] ?? '/Users/' . $user;
+
+            return $this->run(
+                'su - "' . $user . '" -c ' . escapeshellarg($command),
+                $onError
+            );
+        }
+
+        return $this->run($command, $onError);
     }
 
     /**
