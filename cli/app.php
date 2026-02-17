@@ -1,0 +1,876 @@
+<?php
+
+use Silly\Application;
+use Illuminate\Container\Container;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Question\ConfirmationQuestion;
+use Symfony\Component\Console\Question\ChoiceQuestion;
+
+/**
+ * Create the Silly application.
+ */
+$app = new Application('Berkan', \Berkan\Berkan::VERSION);
+
+/**
+ * Install Berkan services.
+ */
+$app->command('install', function (InputInterface $input, OutputInterface $output) {
+    should_be_sudo();
+
+    info('Installing Berkan...');
+
+    $helper = $this->getHelperSet()->get('question');
+
+    // 1. Web server selection
+    $webServerQuestion = new ChoiceQuestion(
+        'Which web server would you like to use?',
+        ['Apache', 'Nginx'],
+        0
+    );
+    $webServerChoice = $helper->ask($input, $output, $webServerQuestion);
+    $webServer = strtolower($webServerChoice) === 'nginx' ? 'nginx' : 'apache';
+
+    // 2. PHP version selection
+    $phpVersionQuestion = new ChoiceQuestion(
+        'Which PHP versions would you like to install? (comma-separated numbers)',
+        ['8.4', '8.3', '8.2', '8.1'],
+        '0'
+    );
+    $phpVersionQuestion->setMultiselect(true);
+    $phpVersions = $helper->ask($input, $output, $phpVersionQuestion);
+
+    // 3. Database selection
+    $dbQuestion = new ChoiceQuestion(
+        'Which databases would you like to install? (comma-separated numbers, or press Enter to skip)',
+        ['MySQL', 'PostgreSQL', 'MongoDB', 'Redis', 'None'],
+        '4'
+    );
+    $dbQuestion->setMultiselect(true);
+    $dbChoices = $helper->ask($input, $output, $dbQuestion);
+
+    $dbMap = [
+        'MySQL' => 'mysql',
+        'PostgreSQL' => 'postgresql',
+        'MongoDB' => 'mongodb',
+        'Redis' => 'redis',
+    ];
+
+    $databases = [];
+    foreach ($dbChoices as $choice) {
+        if (isset($dbMap[$choice])) {
+            $databases[] = $dbMap[$choice];
+        }
+    }
+
+    // Install configuration
+    $config = resolve(\Berkan\Configuration::class);
+    $config->install();
+    $config->updateKey('web_server', $webServer);
+    $config->updateKey('php_versions', $phpVersions);
+    $config->updateKey('databases', $databases);
+
+    // Install web server
+    resolve(\Berkan\Contracts\WebServer::class)->install();
+
+    // Install PHP versions
+    $phpFpm = resolve(\Berkan\PhpFpm::class);
+    $phpFpm->install();
+
+    foreach ($phpVersions as $version) {
+        $formula = 'php@' . $version;
+        $brew = resolve(\Berkan\Brew::class);
+
+        if (! $brew->installed($formula) && ! ($version === '8.4' && $brew->installed('php'))) {
+            $brew->ensureInstalled($formula);
+        }
+    }
+
+    // Install DNS
+    resolve(\Berkan\DnsMasq::class)->install($config->read()['tld'] ?? 'test');
+
+    // Install databases
+    if (! empty($databases)) {
+        $database = resolve(\Berkan\Database::class);
+        foreach ($databases as $db) {
+            $database->install($db);
+        }
+    }
+
+    resolve(\Berkan\Berkan::class)->symlinkToUsersBin();
+
+    info('Berkan installed successfully!');
+    info('Web Server: ' . ucfirst($webServer));
+    info('PHP Versions: ' . implode(', ', $phpVersions));
+    if (! empty($databases)) {
+        info('Databases: ' . implode(', ', $databases));
+    }
+    info('Use "berkan park" to serve a directory.');
+})->descriptions('Install the Berkan services');
+
+/**
+ * Uninstall Berkan services.
+ */
+$app->command('uninstall [--force]', function ($force, InputInterface $input, OutputInterface $output) {
+    should_be_sudo();
+
+    if (! $force) {
+        $helper = $this->getHelperSet()->get('question');
+        $question = new ConfirmationQuestion('Are you sure you want to uninstall Berkan? [y/N] ', false);
+
+        if (! $helper->ask($input, $output, $question)) {
+            warning('Uninstall cancelled.');
+            return;
+        }
+    }
+
+    info('Uninstalling Berkan...');
+
+    resolve(\Berkan\Contracts\WebServer::class)->uninstall();
+    resolve(\Berkan\PhpFpm::class)->stop();
+    resolve(\Berkan\DnsMasq::class)->uninstall();
+
+    // Stop databases
+    resolve(\Berkan\Database::class)->stop();
+
+    resolve(\Berkan\Berkan::class)->unlinkFromUsersBin();
+    resolve(\Berkan\Berkan::class)->removeSudoers();
+    resolve(\Berkan\Berkan::class)->removeLoopback();
+
+    if ($force) {
+        resolve(\Berkan\Configuration::class)->uninstall();
+    }
+
+    info('Berkan has been uninstalled.');
+})->descriptions('Uninstall the Berkan services');
+
+/**
+ * Trust Berkan with sudo.
+ */
+$app->command('trust', function () {
+    should_be_sudo();
+    resolve(\Berkan\Berkan::class)->trust();
+})->descriptions('Configure sudoers file for Berkan');
+
+/**
+ * Start Berkan services.
+ */
+$app->command('start', function () {
+    should_be_sudo();
+
+    resolve(\Berkan\PhpFpm::class)->start();
+    resolve(\Berkan\Contracts\WebServer::class)->start();
+    resolve(\Berkan\DnsMasq::class)->restart();
+
+    info('Berkan services have been started.');
+})->descriptions('Start the Berkan services');
+
+/**
+ * Stop Berkan services.
+ */
+$app->command('stop', function () {
+    should_be_sudo();
+
+    resolve(\Berkan\Contracts\WebServer::class)->stop();
+    resolve(\Berkan\PhpFpm::class)->stop();
+    resolve(\Berkan\DnsMasq::class)->stop();
+
+    info('Berkan services have been stopped.');
+})->descriptions('Stop the Berkan services');
+
+/**
+ * Restart Berkan services.
+ */
+$app->command('restart', function () {
+    should_be_sudo();
+
+    resolve(\Berkan\PhpFpm::class)->restart();
+    resolve(\Berkan\Contracts\WebServer::class)->restart();
+    resolve(\Berkan\DnsMasq::class)->restart();
+
+    info('Berkan services have been restarted.');
+})->descriptions('Restart the Berkan services');
+
+/**
+ * Display Berkan status.
+ */
+$app->command('status', function () {
+    resolve(\Berkan\Status::class)->display();
+})->descriptions('Display the status of Berkan services');
+
+/**
+ * Park a directory.
+ */
+$app->command('park [path]', function ($path = null) {
+    $path = $path ?: getcwd();
+    $path = realpath($path);
+
+    resolve(\Berkan\Configuration::class)->addPath($path);
+
+    info("This directory [{$path}] has been added to Berkan's paths.");
+})->descriptions('Register a directory as a parked path for Berkan');
+
+/**
+ * Display parked paths.
+ */
+$app->command('parked', function () {
+    $paths = resolve(\Berkan\Configuration::class)->parkedPaths();
+
+    if (empty($paths)) {
+        info('No paths are parked.');
+        return;
+    }
+
+    table(['Path'], array_map(function ($path) {
+        return [$path];
+    }, $paths));
+})->descriptions('Display all parked paths');
+
+/**
+ * Forget a parked path.
+ */
+$app->command('forget [path]', function ($path = null) {
+    $path = $path ?: getcwd();
+    $path = realpath($path);
+
+    resolve(\Berkan\Configuration::class)->removePath($path);
+
+    info("The [{$path}] directory has been removed from Berkan's paths.");
+})->descriptions('Remove a parked path from Berkan');
+
+/**
+ * Link a site.
+ */
+$app->command('link [name]', function ($name = null) {
+    $name = $name ?: basename(getcwd());
+    $path = getcwd();
+
+    resolve(\Berkan\Site::class)->link($path, $name);
+
+    $tld = resolve(\Berkan\Configuration::class)->read()['tld'];
+
+    info("A [{$name}] symbolic link has been created in [{$path}].");
+    info("Site available at: http://{$name}.{$tld}");
+})->descriptions('Link the current working directory to Berkan');
+
+/**
+ * Display linked sites.
+ */
+$app->command('links', function () {
+    $links = resolve(\Berkan\Site::class)->links();
+
+    if ($links->isEmpty()) {
+        info('No sites are linked.');
+        return;
+    }
+
+    $tld = resolve(\Berkan\Configuration::class)->read()['tld'];
+
+    table(['Site', 'SSL', 'URL', 'Path'], $links->map(function ($path, $name) use ($tld) {
+        $secured = resolve(\Berkan\Site::class)->secured();
+        $ssl = $secured->contains($name . '.' . $tld) ? 'X' : '';
+        $protocol = $ssl ? 'https' : 'http';
+
+        return [$name, $ssl, "{$protocol}://{$name}.{$tld}", $path];
+    })->values()->all());
+})->descriptions('Display all linked sites');
+
+/**
+ * Unlink a site.
+ */
+$app->command('unlink [name]', function ($name = null) {
+    $name = $name ?: basename(getcwd());
+
+    resolve(\Berkan\Site::class)->unlink($name);
+
+    info("The [{$name}] site has been unlinked.");
+})->descriptions('Remove a linked Berkan site');
+
+/**
+ * Open a site in the browser.
+ */
+$app->command('open [name]', function ($name = null) {
+    $name = $name ?: basename(getcwd());
+    $tld = resolve(\Berkan\Configuration::class)->read()['tld'];
+    $secured = resolve(\Berkan\Site::class)->secured();
+    $protocol = $secured->contains($name . '.' . $tld) ? 'https' : 'http';
+
+    resolve(\Berkan\CommandLine::class)->runAsUser(
+        "open {$protocol}://{$name}.{$tld}"
+    );
+})->descriptions('Open the site in your browser');
+
+/**
+ * Secure a site with HTTPS.
+ */
+$app->command('secure [name]', function ($name = null) {
+    should_be_sudo();
+
+    $name = $name ?: basename(getcwd());
+
+    resolve(\Berkan\Site::class)->secure($name);
+})->descriptions('Secure the given site with a trusted TLS certificate');
+
+/**
+ * Display secured sites.
+ */
+$app->command('secured', function () {
+    $secured = resolve(\Berkan\Site::class)->secured();
+
+    if ($secured->isEmpty()) {
+        info('No sites are secured.');
+        return;
+    }
+
+    table(['Site'], $secured->map(function ($site) {
+        return [$site];
+    })->all());
+})->descriptions('Display all secured sites');
+
+/**
+ * Unsecure a site.
+ */
+$app->command('unsecure [name]', function ($name = null) {
+    should_be_sudo();
+
+    $name = $name ?: basename(getcwd());
+
+    resolve(\Berkan\Site::class)->unsecure($name);
+})->descriptions('Remove TLS certificate from the given site');
+
+/**
+ * Use a specific PHP version.
+ */
+$app->command('use [version]', function ($version) {
+    should_be_sudo();
+
+    resolve(\Berkan\PhpFpm::class)->useVersion($version);
+    resolve(\Berkan\Contracts\WebServer::class)->restart();
+})->descriptions('Change the PHP version used by Berkan');
+
+/**
+ * Isolate a site to use a specific PHP version.
+ */
+$app->command('isolate [version]', function ($version) {
+    $site = basename(getcwd());
+
+    resolve(\Berkan\Site::class)->isolate($site, $version);
+    resolve(\Berkan\PhpFpm::class)->isolateVersion($version);
+})->descriptions('Isolate the current site to use a specific PHP version');
+
+/**
+ * Remove isolation.
+ */
+$app->command('unisolate', function () {
+    $site = basename(getcwd());
+    $version = resolve(\Berkan\Site::class)->phpVersion($site);
+
+    if ($version) {
+        resolve(\Berkan\Site::class)->removeIsolation($site);
+        resolve(\Berkan\PhpFpm::class)->removeIsolation($version);
+    } else {
+        info('This site is not isolated.');
+    }
+})->descriptions('Remove PHP version isolation from the current site');
+
+/**
+ * Display isolated sites.
+ */
+$app->command('isolated', function () {
+    $isolated = resolve(\Berkan\Site::class)->isolated();
+
+    if (empty($isolated)) {
+        info('No sites are isolated.');
+        return;
+    }
+
+    table(['Site', 'PHP Version'], array_map(function ($version, $site) {
+        return [$site, $version];
+    }, $isolated, array_keys($isolated)));
+})->descriptions('Display all isolated sites');
+
+/**
+ * Display which PHP version is currently active.
+ */
+$app->command('which-php', function () {
+    $version = resolve(\Berkan\PhpFpm::class)->currentVersion();
+    output($version ?: 'No PHP version linked');
+})->descriptions('Display the currently active PHP version');
+
+/**
+ * Run a PHP command using Berkan's PHP.
+ */
+$app->command('php', function () {
+    warning('This command is handled by the berkan shell script.');
+})->descriptions('Run PHP using Berkan\'s version');
+
+/**
+ * Run Composer using Berkan's PHP.
+ */
+$app->command('composer', function () {
+    warning('This command is handled by the berkan shell script.');
+})->descriptions('Run Composer using Berkan\'s PHP version');
+
+/**
+ * Share a site.
+ */
+$app->command('share [name]', function ($name = null) {
+    warning('This command is handled by the berkan shell script.');
+})->descriptions('Share the current site via a public URL');
+
+/**
+ * Set the share tool.
+ */
+$app->command('share-tool [tool]', function ($tool = null) {
+    $config = resolve(\Berkan\Configuration::class);
+
+    if ($tool) {
+        if (! in_array($tool, ['ngrok', 'expose', 'cloudflared'])) {
+            warning("Invalid share tool [{$tool}]. Use: ngrok, expose, or cloudflared.");
+            return;
+        }
+
+        $config->updateKey('share_tool', $tool);
+        info("Share tool set to [{$tool}].");
+    } else {
+        $currentTool = $config->read()['share_tool'] ?? 'ngrok';
+        output("Current share tool: {$currentTool}");
+    }
+})->descriptions('Get or set the share tool (ngrok, expose, cloudflared)');
+
+/**
+ * Fetch share URL.
+ */
+$app->command('fetch-share-url', function () {
+    $config = resolve(\Berkan\Configuration::class)->read();
+    $tool = $config['share_tool'] ?? 'ngrok';
+
+    $url = null;
+
+    switch ($tool) {
+        case 'ngrok':
+            $url = resolve(\Berkan\Ngrok::class)->currentTunnelUrl();
+            break;
+        case 'expose':
+            $url = resolve(\Berkan\Expose::class)->currentTunnelUrl();
+            break;
+        case 'cloudflared':
+            $url = resolve(\Berkan\Cloudflared::class)->currentTunnelUrl();
+            break;
+    }
+
+    if ($url) {
+        output($url);
+    } else {
+        warning('No active tunnel found.');
+    }
+})->descriptions('Fetch the current share URL');
+
+/**
+ * Set Ngrok token.
+ */
+$app->command('set-ngrok-token [token]', function ($token) {
+    resolve(\Berkan\Ngrok::class)->setToken($token);
+})->descriptions('Set the Ngrok auth token');
+
+/**
+ * Create a proxy.
+ */
+$app->command('proxy name url [--secure]', function ($name, $url, $secure) {
+    should_be_sudo();
+
+    resolve(\Berkan\Site::class)->proxyCreate($name, $url, $secure);
+})->descriptions('Create a proxy site');
+
+/**
+ * List proxies.
+ */
+$app->command('proxies', function () {
+    $proxies = resolve(\Berkan\Site::class)->proxies();
+
+    if ($proxies->isEmpty()) {
+        info('No proxies configured.');
+        return;
+    }
+
+    $tld = resolve(\Berkan\Configuration::class)->read()['tld'];
+
+    table(['Site', 'Proxy URL'], $proxies->map(function ($host, $name) use ($tld) {
+        return ["{$name}.{$tld}", $host];
+    })->values()->all());
+})->descriptions('Display all proxy sites');
+
+/**
+ * Remove a proxy.
+ */
+$app->command('unproxy name', function ($name) {
+    should_be_sudo();
+
+    resolve(\Berkan\Site::class)->proxyDelete($name);
+})->descriptions('Remove a proxy site');
+
+/**
+ * Run diagnostics.
+ */
+$app->command('diagnose', function () {
+    resolve(\Berkan\Diagnose::class)->display();
+})->descriptions('Run Berkan diagnostics');
+
+/**
+ * View logs.
+ */
+$app->command('log [service]', function ($service = null) {
+    $homePath = resolve(\Berkan\Configuration::class)->homePath();
+    $webServer = resolve(\Berkan\Configuration::class)->read()['web_server'] ?? 'apache';
+
+    $logs = [
+        'php' => $homePath . '/Log/php-error.log',
+        'php-fpm' => $homePath . '/Log/php-fpm.log',
+    ];
+
+    if ($webServer === 'nginx') {
+        $logs['nginx'] = $homePath . '/Log/nginx-error.log';
+        $logs['access'] = $homePath . '/Log/nginx-access.log';
+    } else {
+        $logs['apache'] = $homePath . '/Log/apache-error.log';
+        $logs['access'] = $homePath . '/Log/apache-access.log';
+    }
+
+    if ($service && isset($logs[$service])) {
+        $logFile = $logs[$service];
+
+        if (! file_exists($logFile)) {
+            warning("Log file not found: {$logFile}");
+            return;
+        }
+
+        resolve(\Berkan\CommandLine::class)->passthru("tail -f \"{$logFile}\"");
+    } elseif ($service) {
+        warning("Unknown log service [{$service}]. Available: " . implode(', ', array_keys($logs)));
+    } else {
+        table(['Service', 'Log File'], array_map(function ($path, $name) {
+            $exists = file_exists($path) ? 'exists' : 'not found';
+            return [$name, "{$path} ({$exists})"];
+        }, $logs, array_keys($logs)));
+    }
+})->descriptions('View Berkan log files');
+
+/**
+ * Set the TLD.
+ */
+$app->command('tld [name]', function ($name = null) {
+    $config = resolve(\Berkan\Configuration::class);
+
+    if ($name) {
+        should_be_sudo();
+
+        $oldTld = $config->read()['tld'];
+        $config->updateKey('tld', $name);
+
+        resolve(\Berkan\DnsMasq::class)->updateTld($oldTld, $name);
+        resolve(\Berkan\Site::class)->resecureForNewTld($oldTld, $name);
+        resolve(\Berkan\Contracts\WebServer::class)->installConfiguration();
+        resolve(\Berkan\Contracts\WebServer::class)->installServer();
+        resolve(\Berkan\Contracts\WebServer::class)->restart();
+
+        info("TLD has been changed to [{$name}].");
+    } else {
+        output($config->read()['tld'] ?? 'test');
+    }
+})->descriptions('Get or set the TLD used for Berkan sites');
+
+/**
+ * Toggle directory listing.
+ */
+$app->command('directory-listing [toggle]', function ($toggle = null) {
+    $config = resolve(\Berkan\Configuration::class);
+
+    if ($toggle !== null) {
+        $enabled = in_array($toggle, ['on', '1', 'true', 'yes']);
+        $config->updateKey('directory_listing', $enabled);
+
+        info('Directory listing has been ' . ($enabled ? 'enabled' : 'disabled') . '.');
+    } else {
+        $enabled = $config->read()['directory_listing'] ?? false;
+        output('Directory listing is ' . ($enabled ? 'enabled' : 'disabled'));
+    }
+})->descriptions('Toggle directory listing on or off');
+
+/**
+ * Display registered paths.
+ */
+$app->command('paths', function () {
+    $paths = resolve(\Berkan\Configuration::class)->parkedPaths();
+
+    if (empty($paths)) {
+        info('No paths registered.');
+        return;
+    }
+
+    foreach ($paths as $path) {
+        output($path);
+    }
+})->descriptions('Display all registered paths');
+
+/**
+ * Get or set loopback address.
+ */
+$app->command('loopback [address]', function ($address = null) {
+    $config = resolve(\Berkan\Configuration::class);
+
+    if ($address) {
+        should_be_sudo();
+
+        $config->updateKey('loopback', $address);
+        resolve(\Berkan\Berkan::class)->installLoopback($address);
+        resolve(\Berkan\DnsMasq::class)->install($config->read()['tld']);
+        resolve(\Berkan\Contracts\WebServer::class)->installConfiguration();
+        resolve(\Berkan\Contracts\WebServer::class)->installServer();
+        resolve(\Berkan\Contracts\WebServer::class)->restart();
+
+        info("Loopback address has been set to [{$address}].");
+    } else {
+        output($config->read()['loopback'] ?? BERKAN_LOOPBACK);
+    }
+})->descriptions('Get or set the loopback address');
+
+/**
+ * Check if on latest version.
+ */
+$app->command('on-latest-version', function () {
+    output(\Berkan\Berkan::version());
+})->descriptions('Check if Berkan is on the latest version');
+
+// ============================================================
+// PHP Version Management Commands
+// ============================================================
+
+/**
+ * Install a PHP version.
+ */
+$app->command('php:install version', function ($version) {
+    should_be_sudo();
+
+    $formula = starts_with($version, 'php') ? $version : 'php@' . $version;
+    $brew = resolve(\Berkan\Brew::class);
+
+    if ($brew->installed($formula)) {
+        info("PHP {$version} is already installed.");
+        return;
+    }
+
+    $brew->installOrFail($formula);
+    resolve(\Berkan\PhpFpm::class)->installConfiguration($formula);
+
+    // Update config
+    $config = resolve(\Berkan\Configuration::class);
+    $configData = $config->read();
+    $phpVersions = $configData['php_versions'] ?? [];
+    $cleanVersion = str_replace(['php@', 'php'], '', $formula) ?: $version;
+
+    if (! in_array($cleanVersion, $phpVersions)) {
+        $phpVersions[] = $cleanVersion;
+        $config->updateKey('php_versions', $phpVersions);
+    }
+
+    info("PHP {$version} has been installed.");
+})->descriptions('Install a PHP version');
+
+/**
+ * Remove a PHP version.
+ */
+$app->command('php:remove version', function ($version) {
+    should_be_sudo();
+
+    $formula = starts_with($version, 'php') ? $version : 'php@' . $version;
+    $brew = resolve(\Berkan\Brew::class);
+
+    if (! $brew->installed($formula)) {
+        warning("PHP {$version} is not installed.");
+        return;
+    }
+
+    // Check if it's the active version
+    $currentVersion = resolve(\Berkan\PhpFpm::class)->currentVersion();
+    if ($currentVersion === $formula) {
+        warning("Cannot remove PHP {$version} because it is currently in use.");
+        return;
+    }
+
+    $brew->stopService($formula);
+    resolve(\Berkan\CommandLine::class)->runAsUser('brew uninstall ' . $formula);
+
+    // Update config
+    $config = resolve(\Berkan\Configuration::class);
+    $configData = $config->read();
+    $phpVersions = $configData['php_versions'] ?? [];
+    $cleanVersion = str_replace(['php@', 'php'], '', $formula) ?: $version;
+
+    if (($key = array_search($cleanVersion, $phpVersions)) !== false) {
+        unset($phpVersions[$key]);
+        $config->updateKey('php_versions', array_values($phpVersions));
+    }
+
+    info("PHP {$version} has been removed.");
+})->descriptions('Remove a PHP version');
+
+/**
+ * List installed PHP versions.
+ */
+$app->command('php:list', function () {
+    $brew = resolve(\Berkan\Brew::class);
+    $installed = $brew->supportedPhpVersions();
+
+    if (empty($installed)) {
+        info('No PHP versions installed.');
+        return;
+    }
+
+    $current = resolve(\Berkan\PhpFpm::class)->currentVersion();
+
+    table(['PHP Version', 'Status', 'Active'], array_map(function ($version) use ($brew, $current) {
+        $isActive = ($version === $current) ? 'Yes' : '';
+
+        return [
+            $version,
+            $brew->isStartedService($version) ? 'Running' : 'Stopped',
+            $isActive,
+        ];
+    }, $installed));
+})->descriptions('List installed PHP versions');
+
+// ============================================================
+// Database Management Commands
+// ============================================================
+
+/**
+ * Install a database.
+ */
+$app->command('db:install name', function ($name) {
+    should_be_sudo();
+
+    $name = strtolower($name);
+
+    if (! isset(\Berkan\Database::SUPPORTED_DATABASES[$name])) {
+        warning("Unsupported database: {$name}");
+        warning('Supported databases: ' . implode(', ', array_keys(\Berkan\Database::SUPPORTED_DATABASES)));
+        return;
+    }
+
+    resolve(\Berkan\Database::class)->install($name);
+})->descriptions('Install a database (mysql, postgresql, mongodb, redis)');
+
+/**
+ * Uninstall a database.
+ */
+$app->command('db:uninstall name', function ($name) {
+    should_be_sudo();
+
+    $name = strtolower($name);
+    resolve(\Berkan\Database::class)->uninstall($name);
+})->descriptions('Uninstall a database');
+
+/**
+ * Start a database.
+ */
+$app->command('db:start [name]', function ($name = null) {
+    should_be_sudo();
+
+    $name = $name ? strtolower($name) : null;
+    resolve(\Berkan\Database::class)->start($name);
+
+    info($name ? ucfirst($name) . ' has been started.' : 'All databases have been started.');
+})->descriptions('Start a database (or all installed databases)');
+
+/**
+ * Stop a database.
+ */
+$app->command('db:stop [name]', function ($name = null) {
+    should_be_sudo();
+
+    $name = $name ? strtolower($name) : null;
+    resolve(\Berkan\Database::class)->stop($name);
+
+    info($name ? ucfirst($name) . ' has been stopped.' : 'All databases have been stopped.');
+})->descriptions('Stop a database (or all installed databases)');
+
+/**
+ * Restart a database.
+ */
+$app->command('db:restart [name]', function ($name = null) {
+    should_be_sudo();
+
+    $name = $name ? strtolower($name) : null;
+    resolve(\Berkan\Database::class)->restart($name);
+
+    info($name ? ucfirst($name) . ' has been restarted.' : 'All databases have been restarted.');
+})->descriptions('Restart a database (or all installed databases)');
+
+/**
+ * List databases.
+ */
+$app->command('db:list', function () {
+    $databases = resolve(\Berkan\Database::class)->list();
+
+    table(
+        ['Database', 'Label', 'Installed', 'Status'],
+        array_map(function ($db) {
+            return [
+                $db['name'],
+                $db['label'],
+                $db['installed'] ? 'Yes' : 'No',
+                $db['status'],
+            ];
+        }, $databases)
+    );
+})->descriptions('List all supported databases and their status');
+
+// ============================================================
+// Server Switch Command
+// ============================================================
+
+/**
+ * Switch web server.
+ */
+$app->command('server:switch', function (InputInterface $input, OutputInterface $output) {
+    should_be_sudo();
+
+    $config = resolve(\Berkan\Configuration::class);
+    $currentServer = $config->read()['web_server'] ?? 'apache';
+    $newServer = $currentServer === 'apache' ? 'nginx' : 'apache';
+
+    $helper = $this->getHelperSet()->get('question');
+    $question = new ConfirmationQuestion(
+        "Switch from " . ucfirst($currentServer) . " to " . ucfirst($newServer) . "? [y/N] ",
+        false
+    );
+
+    if (! $helper->ask($input, $output, $question)) {
+        warning('Server switch cancelled.');
+        return;
+    }
+
+    info("Switching from " . ucfirst($currentServer) . " to " . ucfirst($newServer) . "...");
+
+    // Stop current server
+    resolve(\Berkan\Contracts\WebServer::class)->stop();
+
+    // Update config
+    $config->updateKey('web_server', $newServer);
+
+    // Re-resolve the container to get the new server type
+    // We need to clear the resolved instance so it gets re-created
+    $container = \Illuminate\Container\Container::getInstance();
+    $container->forgetInstance(\Berkan\Contracts\WebServer::class);
+
+    // Install the new server
+    $webServer = resolve(\Berkan\Contracts\WebServer::class);
+    $webServer->install();
+
+    // Update sudoers
+    resolve(\Berkan\Berkan::class)->trust();
+
+    info("Successfully switched to " . ucfirst($newServer) . "!");
+})->descriptions('Switch between Apache and Nginx');
+
+return $app;

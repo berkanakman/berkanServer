@@ -1,0 +1,601 @@
+<?php
+
+namespace Berkan;
+
+use Berkan\Contracts\WebServer;
+
+class Site
+{
+    public WebServer $webServer;
+    public Configuration $config;
+    public CommandLine $cli;
+    public Filesystem $files;
+
+    /**
+     * Create a new Site instance.
+     */
+    public function __construct(Configuration $config, CommandLine $cli, Filesystem $files)
+    {
+        $this->config = $config;
+        $this->cli = $cli;
+        $this->files = $files;
+    }
+
+    /**
+     * Set the WebServer instance (used to avoid circular dependency).
+     */
+    public function setWebServer(WebServer $webServer): void
+    {
+        $this->webServer = $webServer;
+    }
+
+    /**
+     * Get the current web server type from config.
+     */
+    protected function getWebServerType(): string
+    {
+        $config = $this->config->read();
+
+        return $config['web_server'] ?? 'apache';
+    }
+
+    /**
+     * Get the path to the linked Berkan sites.
+     */
+    public function sitesPath(): string
+    {
+        return $this->config->homePath() . '/Sites';
+    }
+
+    /**
+     * Get the path to the certificates.
+     */
+    public function certificatesPath(): string
+    {
+        return $this->config->homePath() . '/Certificates';
+    }
+
+    /**
+     * Link the current working directory with the given name.
+     */
+    public function link(string $target, string $name): string
+    {
+        $this->files->ensureDirExists($this->sitesPath(), user());
+
+        $this->files->symlinkAsUser(
+            $target,
+            $this->sitesPath() . '/' . $name
+        );
+
+        return $name;
+    }
+
+    /**
+     * Unlink the given symbolic link.
+     */
+    public function unlink(string $name): void
+    {
+        $path = $this->sitesPath() . '/' . $name;
+
+        if ($this->files->exists($path)) {
+            $this->files->unlink($path);
+        }
+
+        $this->removeWebServerConfig($name);
+    }
+
+    /**
+     * Get all of the linked sites.
+     */
+    public function links(): \Illuminate\Support\Collection
+    {
+        $sitesPath = $this->sitesPath();
+
+        $this->files->ensureDirExists($sitesPath, user());
+
+        return collect($this->files->scandir($sitesPath))
+            ->mapWithKeys(function ($site) use ($sitesPath) {
+                $realPath = $this->files->isLink($sitesPath . '/' . $site)
+                    ? $this->files->readLink($sitesPath . '/' . $site)
+                    : $sitesPath . '/' . $site;
+
+                return [$site => $realPath];
+            });
+    }
+
+    /**
+     * Get all sites from parked paths and linked sites.
+     */
+    public function parked(): \Illuminate\Support\Collection
+    {
+        $parkedPaths = $this->config->parkedPaths();
+        $sites = collect();
+
+        foreach ($parkedPaths as $path) {
+            if (! $this->files->isDir($path)) {
+                continue;
+            }
+
+            $dirContents = $this->files->scandir($path);
+
+            foreach ($dirContents as $dir) {
+                $fullPath = $path . '/' . $dir;
+
+                if ($this->files->isDir($fullPath)) {
+                    $sites->put($dir, $fullPath);
+                }
+            }
+        }
+
+        return $sites;
+    }
+
+    /**
+     * Get all sites (parked + linked).
+     */
+    public function allSites(): \Illuminate\Support\Collection
+    {
+        return $this->parked()->merge($this->links());
+    }
+
+    /**
+     * Secure the given host with TLS.
+     */
+    public function secure(string $url, ?string $siteConf = null): void
+    {
+        $tld = $this->config->read()['tld'];
+        $fullUrl = $url . '.' . $tld;
+
+        // Generate certificate
+        $this->createCertificate($fullUrl);
+
+        // Build the secure server configuration
+        $siteConf = $siteConf ?: $this->buildSecureServer($url);
+
+        // Install the configuration
+        $this->webServer->installSite($url, $siteConf);
+
+        $this->webServer->restart();
+
+        info("The [{$url}] site has been secured with a fresh TLS certificate.");
+    }
+
+    /**
+     * Unsecure the given URL so it will use HTTP.
+     */
+    public function unsecure(string $url): void
+    {
+        $tld = $this->config->read()['tld'];
+        $fullUrl = $url . '.' . $tld;
+
+        // Remove certificate
+        $this->removeCertificate($fullUrl);
+
+        // Remove web server config (it will fall back to catch-all)
+        $this->removeWebServerConfig($url);
+
+        $this->webServer->restart();
+
+        info("The [{$url}] site will now serve traffic over HTTP.");
+    }
+
+    /**
+     * Get all secured sites.
+     */
+    public function secured(): \Illuminate\Support\Collection
+    {
+        $certsPath = $this->certificatesPath();
+
+        if (! $this->files->isDir($certsPath)) {
+            return collect();
+        }
+
+        return collect($this->files->scandir($certsPath))
+            ->filter(function ($file) {
+                return str_ends_with($file, '.crt');
+            })->map(function ($file) {
+                return str_replace('.crt', '', $file);
+            })->values();
+    }
+
+    /**
+     * Create a self-signed TLS certificate for the given URL.
+     */
+    public function createCertificate(string $url): void
+    {
+        $certsPath = $this->certificatesPath();
+
+        $this->files->ensureDirExists($certsPath, user());
+
+        $keyPath = $certsPath . '/' . $url . '.key';
+        $csrPath = $certsPath . '/' . $url . '.csr';
+        $crtPath = $certsPath . '/' . $url . '.crt';
+        $confPath = $certsPath . '/' . $url . '.conf';
+
+        // Build OpenSSL config
+        $opensslConf = $this->files->get(__DIR__ . '/../stubs/openssl.conf');
+        $opensslConf = str_replace('VALET_CERTIFICATE', $url, $opensslConf);
+        $this->files->put($confPath, $opensslConf);
+
+        // Generate private key
+        $this->cli->run("openssl genrsa -out \"{$keyPath}\" 2048 2>/dev/null");
+
+        // Generate CSR
+        $this->cli->run(
+            "openssl req -new -key \"{$keyPath}\" -out \"{$csrPath}\" -config \"{$confPath}\" 2>/dev/null"
+        );
+
+        // Generate self-signed certificate
+        $this->cli->run(
+            "openssl x509 -req -days 365 -in \"{$csrPath}\" -signkey \"{$keyPath}\" " .
+            "-out \"{$crtPath}\" -extensions v3_req -extfile \"{$confPath}\" 2>/dev/null"
+        );
+
+        // Trust the certificate in macOS Keychain
+        $this->trustCertificate($crtPath);
+
+        // Cleanup CSR and conf
+        $this->files->unlink($csrPath);
+    }
+
+    /**
+     * Trust the given certificate file in the macOS Keychain.
+     */
+    public function trustCertificate(string $crtPath): void
+    {
+        $this->cli->run(
+            "sudo security add-trusted-cert -d -r trustRoot " .
+            "-k /Library/Keychains/System.keychain \"{$crtPath}\""
+        );
+    }
+
+    /**
+     * Remove the TLS certificate for the given URL.
+     */
+    public function removeCertificate(string $url): void
+    {
+        $certsPath = $this->certificatesPath();
+
+        $this->files->unlink($certsPath . '/' . $url . '.key');
+        $this->files->unlink($certsPath . '/' . $url . '.csr');
+        $this->files->unlink($certsPath . '/' . $url . '.crt');
+        $this->files->unlink($certsPath . '/' . $url . '.conf');
+
+        // Remove from Keychain
+        $this->cli->run(
+            "sudo security delete-certificate -c \"{$url}\" /Library/Keychains/System.keychain 2>/dev/null"
+        );
+    }
+
+    /**
+     * Get the stub prefix based on web server type.
+     */
+    protected function stubPrefix(): string
+    {
+        return $this->getWebServerType() === 'nginx' ? 'nginx-' : '';
+    }
+
+    /**
+     * Build a secure server configuration.
+     */
+    public function buildSecureServer(string $url): string
+    {
+        $tld = $this->config->read()['tld'];
+        $fullUrl = $url . '.' . $tld;
+        $certsPath = $this->certificatesPath();
+        $sitePath = $this->getSitePath($url);
+
+        $stub = $this->files->get(__DIR__ . '/../stubs/' . $this->stubPrefix() . 'secure.berkan.conf');
+
+        return str_replace(
+            [
+                'VALET_LOOPBACK',
+                'VALET_SITE',
+                'VALET_TLD',
+                'VALET_SITE_PATH',
+                'VALET_HOME_PATH',
+                'VALET_SERVER_PATH',
+                'VALET_CERT',
+                'VALET_KEY',
+                'VALET_PHP_SOCKET',
+            ],
+            [
+                $this->config->read()['loopback'] ?? BERKAN_LOOPBACK,
+                $url,
+                $tld,
+                $sitePath,
+                $this->config->homePath(),
+                realpath(__DIR__ . '/../../'),
+                $certsPath . '/' . $fullUrl . '.crt',
+                $certsPath . '/' . $fullUrl . '.key',
+                'berkan.sock',
+            ],
+            $stub
+        );
+    }
+
+    /**
+     * Build a standard server configuration.
+     */
+    public function buildServer(string $url): string
+    {
+        $tld = $this->config->read()['tld'];
+        $sitePath = $this->getSitePath($url);
+
+        $stub = $this->files->get(__DIR__ . '/../stubs/' . $this->stubPrefix() . 'site.berkan.conf');
+
+        return str_replace(
+            [
+                'VALET_LOOPBACK',
+                'VALET_SITE',
+                'VALET_TLD',
+                'VALET_SITE_PATH',
+                'VALET_HOME_PATH',
+                'VALET_SERVER_PATH',
+                'VALET_PHP_SOCKET',
+            ],
+            [
+                $this->config->read()['loopback'] ?? BERKAN_LOOPBACK,
+                $url,
+                $tld,
+                $sitePath,
+                $this->config->homePath(),
+                realpath(__DIR__ . '/../../'),
+                'berkan.sock',
+            ],
+            $stub
+        );
+    }
+
+    /**
+     * Build a proxy server configuration.
+     */
+    public function buildProxyServer(string $url, string $host): string
+    {
+        $tld = $this->config->read()['tld'];
+
+        $stub = $this->files->get(__DIR__ . '/../stubs/' . $this->stubPrefix() . 'proxy.berkan.conf');
+
+        // Extract host without protocol for WebSocket
+        $wsHost = preg_replace('#^https?://#', '', rtrim($host, '/'));
+
+        return str_replace(
+            [
+                'VALET_LOOPBACK',
+                'VALET_SITE',
+                'VALET_TLD',
+                'VALET_HOME_PATH',
+                'VALET_PROXY_HOST',
+                'VALET_PROXY_HOST_WS',
+            ],
+            [
+                $this->config->read()['loopback'] ?? BERKAN_LOOPBACK,
+                $url,
+                $tld,
+                $this->config->homePath(),
+                $host,
+                $wsHost,
+            ],
+            $stub
+        );
+    }
+
+    /**
+     * Build a secure proxy server configuration.
+     */
+    public function buildSecureProxyServer(string $url, string $host): string
+    {
+        $tld = $this->config->read()['tld'];
+        $fullUrl = $url . '.' . $tld;
+        $certsPath = $this->certificatesPath();
+
+        $stub = $this->files->get(__DIR__ . '/../stubs/' . $this->stubPrefix() . 'secure.proxy.berkan.conf');
+
+        $wsHost = preg_replace('#^https?://#', '', rtrim($host, '/'));
+
+        return str_replace(
+            [
+                'VALET_LOOPBACK',
+                'VALET_SITE',
+                'VALET_TLD',
+                'VALET_HOME_PATH',
+                'VALET_CERT',
+                'VALET_KEY',
+                'VALET_PROXY_HOST',
+                'VALET_PROXY_HOST_WS',
+            ],
+            [
+                $this->config->read()['loopback'] ?? BERKAN_LOOPBACK,
+                $url,
+                $tld,
+                $this->config->homePath(),
+                $certsPath . '/' . $fullUrl . '.crt',
+                $certsPath . '/' . $fullUrl . '.key',
+                $host,
+                $wsHost,
+            ],
+            $stub
+        );
+    }
+
+    /**
+     * Proxy the given URL to the given host.
+     */
+    public function proxyCreate(string $url, string $host, bool $secure = false): void
+    {
+        $tld = $this->config->read()['tld'];
+
+        if ($secure) {
+            $fullUrl = $url . '.' . $tld;
+            $this->createCertificate($fullUrl);
+            $siteConf = $this->buildSecureProxyServer($url, $host);
+        } else {
+            $siteConf = $this->buildProxyServer($url, $host);
+        }
+
+        // Write proxy metadata
+        $this->files->putAsUser(
+            $this->sitesPath() . '/' . $url . '.proxy',
+            $host
+        );
+
+        $this->webServer->installSite($url, $siteConf);
+        $this->webServer->restart();
+
+        info("Proxy for [{$url}] has been created to [{$host}].");
+    }
+
+    /**
+     * Remove the given proxy.
+     */
+    public function proxyDelete(string $url): void
+    {
+        $this->files->unlink($this->sitesPath() . '/' . $url . '.proxy');
+        $this->removeWebServerConfig($url);
+
+        $tld = $this->config->read()['tld'];
+        $fullUrl = $url . '.' . $tld;
+        $this->removeCertificate($fullUrl);
+
+        $this->webServer->restart();
+
+        info("Proxy for [{$url}] has been removed.");
+    }
+
+    /**
+     * Get all proxies.
+     */
+    public function proxies(): \Illuminate\Support\Collection
+    {
+        $sitesPath = $this->sitesPath();
+
+        if (! $this->files->isDir($sitesPath)) {
+            return collect();
+        }
+
+        return collect($this->files->scandir($sitesPath))
+            ->filter(function ($file) {
+                return str_ends_with($file, '.proxy');
+            })->mapWithKeys(function ($file) use ($sitesPath) {
+                $name = str_replace('.proxy', '', $file);
+                $host = trim($this->files->get($sitesPath . '/' . $file));
+
+                return [$name => $host];
+            });
+    }
+
+    /**
+     * Remove the web server configuration for the given site.
+     */
+    protected function removeWebServerConfig(string $url): void
+    {
+        if (isset($this->webServer)) {
+            $this->webServer->removeSite($url);
+        }
+    }
+
+    /**
+     * Get the site path for the given URL.
+     */
+    public function getSitePath(string $url): string
+    {
+        // Check linked sites first
+        $linkPath = $this->sitesPath() . '/' . $url;
+
+        if ($this->files->exists($linkPath)) {
+            if ($this->files->isLink($linkPath)) {
+                return $this->files->readLink($linkPath);
+            }
+
+            return $linkPath;
+        }
+
+        // Check parked paths
+        foreach ($this->config->parkedPaths() as $path) {
+            $sitePath = $path . '/' . $url;
+
+            if ($this->files->isDir($sitePath)) {
+                return $sitePath;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Resecure all currently secured sites with a new TLD.
+     */
+    public function resecureForNewTld(string $oldTld, string $newTld): void
+    {
+        if (! $this->files->isDir($this->certificatesPath())) {
+            return;
+        }
+
+        $secured = collect($this->files->scandir($this->certificatesPath()))
+            ->filter(function ($file) use ($oldTld) {
+                return str_ends_with($file, '.' . $oldTld . '.crt');
+            })->map(function ($file) use ($oldTld) {
+                return str_replace(['.' . $oldTld . '.crt'], '', $file);
+            });
+
+        foreach ($secured as $url) {
+            $this->unsecure($url);
+        }
+
+        foreach ($secured as $url) {
+            $this->secure($url);
+        }
+    }
+
+    /**
+     * Get the isolated PHP version for the given site.
+     */
+    public function phpVersion(string $site): ?string
+    {
+        $config = $this->config->read();
+
+        return $config['isolated_versions'][$site] ?? null;
+    }
+
+    /**
+     * Isolate a site to use a specific PHP version.
+     */
+    public function isolate(string $site, string $phpVersion): void
+    {
+        $config = $this->config->read();
+
+        if (! isset($config['isolated_versions'])) {
+            $config['isolated_versions'] = [];
+        }
+
+        $config['isolated_versions'][$site] = $phpVersion;
+        $this->config->write($config);
+
+        info("Site [{$site}] is now using PHP {$phpVersion}.");
+    }
+
+    /**
+     * Remove PHP version isolation from a site.
+     */
+    public function removeIsolation(string $site): void
+    {
+        $config = $this->config->read();
+
+        if (isset($config['isolated_versions'][$site])) {
+            unset($config['isolated_versions'][$site]);
+            $this->config->write($config);
+        }
+
+        info("Site [{$site}] isolation has been removed.");
+    }
+
+    /**
+     * Get all isolated sites.
+     */
+    public function isolated(): array
+    {
+        $config = $this->config->read();
+
+        return $config['isolated_versions'] ?? [];
+    }
+}

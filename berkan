@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+
+set -e
+
+SOURCE="${BASH_SOURCE[0]}"
+
+# Resolve symlinks
+while [ -h "$SOURCE" ]; do
+    DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+
+DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+
+# Find a usable PHP binary
+if [ -f "$DIR/find-usable-php.php" ]; then
+    PHP=$(php "$DIR/find-usable-php.php" 2>/dev/null)
+fi
+
+if [ -z "$PHP" ] || [ ! -x "$PHP" ]; then
+    # Try common PHP locations
+    for php_path in \
+        /opt/homebrew/opt/php/bin/php \
+        /opt/homebrew/opt/php@8.4/bin/php \
+        /opt/homebrew/opt/php@8.3/bin/php \
+        /opt/homebrew/opt/php@8.2/bin/php \
+        /opt/homebrew/opt/php@8.1/bin/php \
+        /usr/local/opt/php/bin/php \
+        /usr/local/opt/php@8.4/bin/php \
+        /usr/local/opt/php@8.3/bin/php \
+        /usr/local/opt/php@8.2/bin/php \
+        /usr/local/opt/php@8.1/bin/php \
+        /usr/bin/php; do
+        if [ -x "$php_path" ]; then
+            PHP="$php_path"
+            break
+        fi
+    done
+fi
+
+if [ -z "$PHP" ]; then
+    echo "Error: No usable PHP binary found." >&2
+    exit 1
+fi
+
+# Handle special commands
+case "$1" in
+    share)
+        shift
+        SITE_NAME="${1:-$(basename "$(pwd)")}"
+        CONFIG_PATH="$HOME/.config/berkan/config.json"
+
+        if [ -f "$CONFIG_PATH" ]; then
+            TLD=$($PHP -r "echo json_decode(file_get_contents('$CONFIG_PATH'))->tld ?? 'test';")
+            SHARE_TOOL=$($PHP -r "echo json_decode(file_get_contents('$CONFIG_PATH'))->share_tool ?? 'ngrok';")
+        else
+            TLD="test"
+            SHARE_TOOL="ngrok"
+        fi
+
+        DOMAIN="${SITE_NAME}.${TLD}"
+
+        case "$SHARE_TOOL" in
+            ngrok)
+                ngrok http --host-header=rewrite "${DOMAIN}:80"
+                ;;
+            expose)
+                expose share "${DOMAIN}:80"
+                ;;
+            cloudflared)
+                cloudflared tunnel --url "http://${DOMAIN}:80"
+                ;;
+            *)
+                echo "Unknown share tool: $SHARE_TOOL" >&2
+                exit 1
+                ;;
+        esac
+        ;;
+
+    php)
+        shift
+        $PHP "$@"
+        ;;
+
+    composer)
+        shift
+        COMPOSER_BIN=$(which composer 2>/dev/null || echo "")
+
+        if [ -z "$COMPOSER_BIN" ]; then
+            # Try common composer locations
+            for composer_path in \
+                /opt/homebrew/bin/composer \
+                /usr/local/bin/composer \
+                "$HOME/.composer/vendor/bin/composer" \
+                "$HOME/.config/composer/vendor/bin/composer"; do
+                if [ -x "$composer_path" ]; then
+                    COMPOSER_BIN="$composer_path"
+                    break
+                fi
+            done
+        fi
+
+        if [ -z "$COMPOSER_BIN" ]; then
+            echo "Error: Composer not found." >&2
+            exit 1
+        fi
+
+        $PHP "$COMPOSER_BIN" "$@"
+        ;;
+
+    *)
+        if [ "$1" = "install" ] || [ "$1" = "uninstall" ] || [ "$1" = "trust" ] || \
+           [ "$1" = "start" ] || [ "$1" = "stop" ] || [ "$1" = "restart" ] || \
+           [ "$1" = "secure" ] || [ "$1" = "unsecure" ] || [ "$1" = "use" ] || \
+           [ "$1" = "proxy" ] || [ "$1" = "unproxy" ] || [ "$1" = "tld" ] || \
+           [ "$1" = "loopback" ] || \
+           [ "$1" = "php:install" ] || [ "$1" = "php:remove" ] || \
+           [ "$1" = "db:install" ] || [ "$1" = "db:uninstall" ] || \
+           [ "$1" = "db:start" ] || [ "$1" = "db:stop" ] || [ "$1" = "db:restart" ] || \
+           [ "$1" = "server:switch" ]; then
+            sudo $PHP "$DIR/cli/berkan.php" "$@"
+        else
+            $PHP "$DIR/cli/berkan.php" "$@"
+        fi
+        ;;
+esac
