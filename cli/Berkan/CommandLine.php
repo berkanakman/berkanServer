@@ -30,9 +30,8 @@ class CommandLine
     public function runAsUser(string $command, ?callable $onError = null): string
     {
         $user = user();
-        $home = posix_getpwnam($user)['dir'] ?? '/Users/' . $user;
 
-        return $this->run('sudo -u "' . $user . '" HOME="' . $home . '" ' . $command, $onError);
+        return $this->run('sudo -iu "' . $user . '" -- ' . $command, $onError);
     }
 
     /**

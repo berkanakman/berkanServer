@@ -123,6 +123,9 @@ class Brew
             trim('brew install ' . $formula . ' ' . implode(' ', $options)),
             function ($exitCode, $errorOutput) use ($formula) {
                 warning("Failed to install {$formula}.");
+                if ($errorOutput) {
+                    warning(trim($errorOutput));
+                }
                 throw new \DomainException('Brew was unable to install [' . $formula . '].');
             }
         );
