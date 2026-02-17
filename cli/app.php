@@ -59,13 +59,26 @@ $app->command('install', function (InputInterface $input, OutputInterface $outpu
     }
 
     // Check Composer
-    $composerCheck = trim($cli->runAsUser('which composer 2>/dev/null'));
-    if (empty($composerCheck)) {
+    $composerBin = null;
+    $composerPaths = [BREW_PREFIX . '/bin/composer', '/usr/local/bin/composer', '/opt/homebrew/bin/composer'];
+    foreach ($composerPaths as $path) {
+        if (file_exists($path)) {
+            $composerBin = $path;
+            break;
+        }
+    }
+
+    if (! $composerBin) {
         info('Composer is not installed. Installing via Homebrew...');
         $cli->runAsUser($brewBin . ' install composer');
 
-        $composerCheck = trim($cli->runAsUser('which composer 2>/dev/null'));
-        if (empty($composerCheck)) {
+        foreach ($composerPaths as $path) {
+            if (file_exists($path)) {
+                $composerBin = $path;
+                break;
+            }
+        }
+        if (! $composerBin) {
             warning('Composer installation failed. Please install manually: https://getcomposer.org');
             return;
         }
