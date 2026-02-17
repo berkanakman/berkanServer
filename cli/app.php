@@ -882,7 +882,7 @@ $app->command('php:remove version', function ($version) {
     }
 
     $brew->stopService($formula);
-    resolve(\Berkan\CommandLine::class)->runAsUser('brew uninstall ' . $formula);
+    resolve(\Berkan\CommandLine::class)->runAsUser(BREW_PREFIX . '/bin/brew uninstall ' . $formula);
 
     // Update config
     $config = resolve(\Berkan\Configuration::class);

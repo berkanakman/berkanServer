@@ -44,7 +44,7 @@ class Brew
      */
     public function installedFormulae(): array
     {
-        return explode("\n", trim($this->cli->runAsUser('brew list --formula 2>/dev/null')));
+        return explode("\n", trim($this->cli->runAsUser($this->brewBin() . ' list --formula 2>/dev/null')));
     }
 
     /**
@@ -120,7 +120,7 @@ class Brew
         }
 
         $this->cli->runAsUser(
-            trim('brew install ' . $formula . ' ' . implode(' ', $options)),
+            trim($this->brewBin() . ' install ' . $formula . ' ' . implode(' ', $options)),
             function ($exitCode, $errorOutput) use ($formula) {
                 warning("Failed to install {$formula}.");
                 if ($errorOutput) {
@@ -137,7 +137,7 @@ class Brew
     public function tap(array $formulas): void
     {
         foreach ($formulas as $formula) {
-            $this->cli->runAsUser('brew tap ' . $formula);
+            $this->cli->runAsUser($this->brewBin() . ' tap ' . $formula);
         }
     }
 
@@ -151,7 +151,7 @@ class Brew
         foreach ($services as $service) {
             if ($this->installed($service)) {
                 info("Restarting {$service}...");
-                $this->cli->quietly('sudo brew services restart ' . $service);
+                $this->cli->quietly('sudo ' . $this->brewBin() . ' services restart ' . $service);
             }
         }
     }
@@ -166,7 +166,7 @@ class Brew
         foreach ($services as $service) {
             if ($this->installed($service)) {
                 info("Stopping {$service}...");
-                $this->cli->quietly('sudo brew services stop ' . $service);
+                $this->cli->quietly('sudo ' . $this->brewBin() . ' services stop ' . $service);
             }
         }
     }
@@ -181,7 +181,7 @@ class Brew
         foreach ($services as $service) {
             if ($this->installed($service)) {
                 info("Starting {$service}...");
-                $this->cli->quietly('sudo brew services start ' . $service);
+                $this->cli->quietly('sudo ' . $this->brewBin() . ' services start ' . $service);
             }
         }
     }
@@ -191,7 +191,7 @@ class Brew
      */
     public function isStartedService(string $service): bool
     {
-        $result = $this->cli->run('brew services list 2>/dev/null');
+        $result = $this->cli->run($this->brewBin() . ' services list 2>/dev/null');
 
         return str_contains($result, $service) && (
             str_contains($result, 'started') || str_contains($result, 'running')
@@ -204,7 +204,7 @@ class Brew
     public function link(string $formula, bool $force = false): string
     {
         return $this->cli->runAsUser(
-            'brew link ' . $formula . ($force ? ' --force --overwrite' : '')
+            $this->brewBin() . ' link ' . $formula . ($force ? ' --force --overwrite' : '')
         );
     }
 
@@ -213,7 +213,7 @@ class Brew
      */
     public function unlink(string $formula): string
     {
-        return $this->cli->runAsUser('brew unlink ' . $formula);
+        return $this->cli->runAsUser($this->brewBin() . ' unlink ' . $formula);
     }
 
     /**
@@ -243,6 +243,14 @@ class Brew
             ->filter(function ($version) use ($installed) {
                 return in_array($version, $installed);
             })->values()->all();
+    }
+
+    /**
+     * Get the full path to the brew binary.
+     */
+    public function brewBin(): string
+    {
+        return BREW_PREFIX . '/bin/brew';
     }
 
     /**

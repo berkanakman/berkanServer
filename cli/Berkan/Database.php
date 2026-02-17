@@ -76,7 +76,7 @@ class Database
         $this->stop($database);
 
         info("Uninstalling {$dbInfo['label']}...");
-        $this->cli->runAsUser('brew uninstall ' . $dbInfo['formula']);
+        $this->cli->runAsUser(BREW_PREFIX . '/bin/brew uninstall ' . $dbInfo['formula']);
 
         // Remove from config
         $config = $this->config->read();

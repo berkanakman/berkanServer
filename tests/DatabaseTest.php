@@ -108,7 +108,7 @@ class DatabaseTest extends TestCase
 
         $this->cli->expects($this->once())
             ->method('runAsUser')
-            ->with('brew uninstall redis');
+            ->with(BREW_PREFIX . '/bin/brew uninstall redis');
 
         $this->database->uninstall('redis');
 

@@ -106,7 +106,7 @@ class BrewTest extends TestCase
     {
         $this->cli->expects($this->once())
             ->method('runAsUser')
-            ->with('brew list --formula 2>/dev/null')
+            ->with(BREW_PREFIX . '/bin/brew list --formula 2>/dev/null')
             ->willReturn("php\nhttpd");
 
         $this->brew->ensureInstalled('php');
@@ -220,7 +220,7 @@ class BrewTest extends TestCase
 
         $this->cli->expects($this->once())
             ->method('quietly')
-            ->with('sudo brew services restart httpd');
+            ->with('sudo ' . BREW_PREFIX . '/bin/brew services restart httpd');
 
         $this->brew->restartService('httpd');
     }
@@ -232,7 +232,7 @@ class BrewTest extends TestCase
 
         $this->cli->expects($this->once())
             ->method('quietly')
-            ->with('sudo brew services stop httpd');
+            ->with('sudo ' . BREW_PREFIX . '/bin/brew services stop httpd');
 
         $this->brew->stopService('httpd');
     }
@@ -244,7 +244,7 @@ class BrewTest extends TestCase
 
         $this->cli->expects($this->once())
             ->method('quietly')
-            ->with('sudo brew services start httpd');
+            ->with('sudo ' . BREW_PREFIX . '/bin/brew services start httpd');
 
         $this->brew->startService('httpd');
     }
@@ -253,7 +253,7 @@ class BrewTest extends TestCase
     {
         $this->cli->expects($this->once())
             ->method('runAsUser')
-            ->with('brew link php')
+            ->with(BREW_PREFIX . '/bin/brew link php')
             ->willReturn('linked');
 
         $this->assertEquals('linked', $this->brew->link('php'));
@@ -263,7 +263,7 @@ class BrewTest extends TestCase
     {
         $this->cli->expects($this->once())
             ->method('runAsUser')
-            ->with('brew link php --force --overwrite')
+            ->with(BREW_PREFIX . '/bin/brew link php --force --overwrite')
             ->willReturn('linked');
 
         $this->assertEquals('linked', $this->brew->link('php', true));
@@ -273,7 +273,7 @@ class BrewTest extends TestCase
     {
         $this->cli->expects($this->once())
             ->method('runAsUser')
-            ->with('brew unlink php')
+            ->with(BREW_PREFIX . '/bin/brew unlink php')
             ->willReturn('unlinked');
 
         $this->assertEquals('unlinked', $this->brew->unlink('php'));
@@ -284,7 +284,7 @@ class BrewTest extends TestCase
         $this->cli->expects($this->exactly(2))
             ->method('runAsUser')
             ->willReturnCallback(function ($cmd) {
-                $this->assertStringStartsWith('brew tap ', $cmd);
+                $this->assertStringStartsWith(BREW_PREFIX . '/bin/brew tap ', $cmd);
                 return '';
             });
 
@@ -295,7 +295,7 @@ class BrewTest extends TestCase
     {
         $this->cli->expects($this->once())
             ->method('runAsUser')
-            ->with('brew tap shivammathur/php');
+            ->with(BREW_PREFIX . '/bin/brew tap shivammathur/php');
 
         $this->brew->tap(['shivammathur/php']);
     }
@@ -344,10 +344,10 @@ class BrewTest extends TestCase
 
         $this->cli->method('runAsUser')
             ->willReturnCallback(function ($cmd) use (&$tapCalled, &$installCalled) {
-                if (str_contains($cmd, 'brew tap shivammathur/php')) {
+                if (str_contains($cmd, BREW_PREFIX . '/bin/brew tap shivammathur/php')) {
                     $tapCalled = true;
                 }
-                if (str_contains($cmd, 'brew install php@7.4')) {
+                if (str_contains($cmd, BREW_PREFIX . '/bin/brew install php@7.4')) {
                     $installCalled = true;
                 }
                 return '';
