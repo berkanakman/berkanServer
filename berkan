@@ -119,7 +119,11 @@ case "$1" in
            [ "$1" = "db:install" ] || [ "$1" = "db:uninstall" ] || \
            [ "$1" = "db:start" ] || [ "$1" = "db:stop" ] || [ "$1" = "db:restart" ] || \
            [ "$1" = "server:switch" ]; then
-            sudo $PHP "$DIR/cli/berkan.php" "$@"
+            if [ "$(id -u)" -eq 0 ]; then
+                $PHP "$DIR/cli/berkan.php" "$@"
+            else
+                sudo BERKAN_SUDO_USER="$USER" $PHP "$DIR/cli/berkan.php" "$@"
+            fi
         else
             $PHP "$DIR/cli/berkan.php" "$@"
         fi

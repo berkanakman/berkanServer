@@ -67,11 +67,17 @@ function writer(): ConsoleOutput
  */
 function user(): string
 {
-    if (! isset($_SERVER['SUDO_USER'])) {
-        return $_SERVER['USER'];
+    // BERKAN_SUDO_USER is set by the berkan bash script to preserve
+    // the original user when auto-elevating with sudo
+    if (! empty($_SERVER['BERKAN_SUDO_USER'])) {
+        return $_SERVER['BERKAN_SUDO_USER'];
     }
 
-    return $_SERVER['SUDO_USER'];
+    if (! empty($_SERVER['SUDO_USER'])) {
+        return $_SERVER['SUDO_USER'];
+    }
+
+    return $_SERVER['USER'];
 }
 
 /**
