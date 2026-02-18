@@ -32,29 +32,35 @@ class CommandLine
         if (posix_getuid() === 0) {
             $user = user();
             $userInfo = posix_getpwnam($user);
+            $uid = (int) $userInfo['uid'];
+            $gid = (int) $userInfo['gid'];
             $home = $userInfo['dir'];
 
-            $script = '#!/bin/bash' . "\n"
-                . 'export HOME=' . escapeshellarg($home) . "\n"
-                . 'export USER=' . escapeshellarg($user) . "\n"
-                . 'export LOGNAME=' . escapeshellarg($user) . "\n"
-                . 'export PATH="' . BREW_PREFIX . '/bin:' . BREW_PREFIX . '/sbin:/usr/bin:/bin:/usr/sbin:/sbin"' . "\n"
-                . $command . "\n";
+            // Create a PHP helper that drops privileges then execs the command
+            $helper = sys_get_temp_dir() . '/berkan_exec_' . getmypid() . '.php';
+            $phpCode = '<?php' . "\n"
+                . 'posix_setgid(' . $gid . ');' . "\n"
+                . 'posix_initgroups(' . var_export($user, true) . ', ' . $gid . ');' . "\n"
+                . 'posix_setuid(' . $uid . ');' . "\n"
+                . 'putenv("HOME=' . $home . '");' . "\n"
+                . 'putenv("USER=' . $user . '");' . "\n"
+                . 'putenv("LOGNAME=' . $user . '");' . "\n"
+                . 'putenv("PATH=' . BREW_PREFIX . '/bin:' . BREW_PREFIX . '/sbin:/usr/bin:/bin:/usr/sbin:/sbin");' . "\n"
+                . '$r = proc_open(["bash", "-c", $argv[1]], [1 => ["pipe", "w"], 2 => ["pipe", "w"]], $p);' . "\n"
+                . '$o = stream_get_contents($p[1]); $e = stream_get_contents($p[2]);' . "\n"
+                . 'fclose($p[1]); fclose($p[2]); $x = proc_close($r);' . "\n"
+                . 'fwrite(STDOUT, $o); fwrite(STDERR, $e); exit($x);' . "\n";
 
-            $wrapper = sys_get_temp_dir() . '/berkan_run_' . getmypid() . '.sh';
-            file_put_contents($wrapper, $script);
-            chmod($wrapper, 0755);
+            file_put_contents($helper, $phpCode);
 
-            $process = new Process(['sudo', '-u', $user, 'bash', $wrapper]);
+            $process = new Process([PHP_BINARY, $helper, $command]);
             $process->setTimeout(null);
             $process->run();
 
-            @unlink($wrapper);
+            @unlink($helper);
 
-            if ($process->getExitCode() > 0) {
-                if ($onError) {
-                    $onError($process->getExitCode(), $process->getErrorOutput());
-                }
+            if ($process->getExitCode() > 0 && $onError) {
+                $onError($process->getExitCode(), $process->getErrorOutput());
             }
 
             return $process->getOutput();
