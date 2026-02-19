@@ -362,10 +362,14 @@ class PhpFpm
      */
     public function removeIsolation(string $phpVersion): void
     {
-        $fpmConfigPath = $this->fpmConfigPath($phpVersion);
+        $fpmConfigPath = str_replace('berkan-fpm.conf', 'berkan-isolated-fpm.conf', $this->fpmConfigPath($phpVersion));
 
         if ($this->files->exists($fpmConfigPath)) {
             $this->files->unlink($fpmConfigPath);
+        }
+
+        if ($this->brew->isStartedService($phpVersion)) {
+            $this->brew->restartService($phpVersion);
         }
     }
 }

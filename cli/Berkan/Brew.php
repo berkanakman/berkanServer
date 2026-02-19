@@ -194,9 +194,15 @@ class Brew
     {
         $result = $this->cli->run($this->brewBin() . ' services list 2>/dev/null');
 
-        return str_contains($result, $service) && (
-            str_contains($result, 'started') || str_contains($result, 'running')
-        );
+        foreach (explode("\n", $result) as $line) {
+            if (str_contains($line, $service) && (
+                str_contains($line, 'started') || str_contains($line, 'running')
+            )) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
