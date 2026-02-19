@@ -354,8 +354,11 @@ class Site
 
         $stub = $this->files->get(__DIR__ . '/../stubs/' . $this->stubPrefix() . 'secure.berkan.conf');
 
+        $httpsPort = $config['https_port'] ?? '443';
+
         return str_replace(
             [
+                'BERKAN_HTTPS_SUFFIX',
                 'BERKAN_LOOPBACK',
                 'BERKAN_HTTP_PORT',
                 'BERKAN_HTTPS_PORT',
@@ -369,9 +372,10 @@ class Site
                 'BERKAN_KEY',
             ],
             [
+                $httpsPort !== '443' ? ':' . $httpsPort : '',
                 $config['loopback'] ?? BERKAN_LOOPBACK,
                 $config['http_port'] ?? '80',
-                $config['https_port'] ?? '443',
+                $httpsPort,
                 $sitePath,
                 realpath(__DIR__ . '/../../'),
                 $this->config->homePath(),
@@ -478,9 +482,11 @@ class Site
         $stub = $this->files->get(__DIR__ . '/../stubs/' . $this->stubPrefix() . 'secure.proxy.berkan.conf');
 
         $wsHost = preg_replace('#^https?://#', '', rtrim($host, '/'));
+        $httpsPort = $config['https_port'] ?? '443';
 
         return str_replace(
             [
+                'BERKAN_HTTPS_SUFFIX',
                 'BERKAN_LOOPBACK',
                 'BERKAN_HTTP_PORT',
                 'BERKAN_HTTPS_PORT',
@@ -493,9 +499,10 @@ class Site
                 'BERKAN_TLD',
             ],
             [
+                $httpsPort !== '443' ? ':' . $httpsPort : '',
                 $config['loopback'] ?? BERKAN_LOOPBACK,
                 $config['http_port'] ?? '80',
-                $config['https_port'] ?? '443',
+                $httpsPort,
                 $this->config->homePath(),
                 $wsHost,
                 $host,
@@ -608,6 +615,38 @@ class Site
         }
 
         return '';
+    }
+
+    /**
+     * Rebuild all site VirtualHost configs without touching certificates.
+     *
+     * Useful when ports or other config values change (e.g. during install).
+     */
+    public function rebuildSiteConfigs(): void
+    {
+        $tld = $this->config->read()['tld'] ?? 'test';
+
+        // Rebuild secured site configs
+        foreach ($this->secured() as $fullUrl) {
+            $siteName = str_replace('.' . $tld, '', $fullUrl);
+
+            $siteConf = $this->buildSecureServer($siteName);
+            $this->webServer()->installSite($siteName, $siteConf);
+        }
+
+        // Rebuild proxy site configs
+        foreach ($this->proxies() as $name => $host) {
+            $fullUrl = $name . '.' . $tld;
+            $certsPath = $this->certificatesPath();
+
+            if ($this->files->exists($certsPath . '/' . $fullUrl . '.crt')) {
+                $siteConf = $this->buildSecureProxyServer($name, $host);
+            } else {
+                $siteConf = $this->buildProxyServer($name, $host);
+            }
+
+            $this->webServer()->installSite($name, $siteConf);
+        }
     }
 
     /**

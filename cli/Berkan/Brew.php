@@ -192,6 +192,7 @@ class Brew
      */
     public function isStartedService(string $service): bool
     {
+        // First try brew services list (works for user-level services)
         $result = $this->cli->run($this->brewBin() . ' services list 2>/dev/null');
 
         foreach (explode("\n", $result) as $line) {
@@ -202,7 +203,10 @@ class Brew
             }
         }
 
-        return false;
+        // Fallback: check if the process is actually running (covers root-level services)
+        $pgrep = trim($this->cli->run('pgrep -f ' . escapeshellarg($service) . ' 2>/dev/null'));
+
+        return ! empty($pgrep);
     }
 
     /**

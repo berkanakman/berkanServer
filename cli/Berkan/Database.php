@@ -92,13 +92,18 @@ class Database
 
     /**
      * Start a database or all installed databases.
+     *
+     * Databases run as the current user (not root) because services
+     * like PostgreSQL refuse to start under root for security reasons.
      */
     public function start(?string $database = null): void
     {
         if ($database) {
             $dbInfo = static::SUPPORTED_DATABASES[$database] ?? null;
-            if ($dbInfo) {
-                $this->brew->startService($dbInfo['service']);
+            if ($dbInfo && $this->brew->installed($dbInfo['formula'])) {
+                info("Starting {$dbInfo['service']}...");
+                $this->stopRootService($dbInfo['service']);
+                $this->cli->quietly($this->userBrewCommand('start', $dbInfo['service']));
             }
             return;
         }
@@ -115,8 +120,11 @@ class Database
     {
         if ($database) {
             $dbInfo = static::SUPPORTED_DATABASES[$database] ?? null;
-            if ($dbInfo) {
-                $this->brew->stopService($dbInfo['service']);
+            if ($dbInfo && $this->brew->installed($dbInfo['formula'])) {
+                info("Stopping {$dbInfo['service']}...");
+                // Stop both root and user level services
+                $this->cli->quietly('sudo ' . $this->brew->brewBin() . ' services stop ' . $dbInfo['service']);
+                $this->cli->quietly($this->userBrewCommand('stop', $dbInfo['service']));
             }
             return;
         }
@@ -133,8 +141,10 @@ class Database
     {
         if ($database) {
             $dbInfo = static::SUPPORTED_DATABASES[$database] ?? null;
-            if ($dbInfo) {
-                $this->brew->restartService($dbInfo['service']);
+            if ($dbInfo && $this->brew->installed($dbInfo['formula'])) {
+                info("Restarting {$dbInfo['service']}...");
+                $this->stopRootService($dbInfo['service']);
+                $this->cli->quietly($this->userBrewCommand('restart', $dbInfo['service']));
             }
             return;
         }
@@ -142,6 +152,46 @@ class Database
         foreach ($this->installed() as $db) {
             $this->restart($db);
         }
+    }
+
+    /**
+     * Stop a root-level service registration if it exists.
+     *
+     * Databases must not run as root. If a previous install registered
+     * the service under root, we need to deregister it first.
+     * Also fixes log file ownership so brew doesn't report errors.
+     */
+    protected function stopRootService(string $service): void
+    {
+        if (posix_getuid() === 0) {
+            $this->cli->quietly('sudo ' . $this->brew->brewBin() . ' services stop ' . $service);
+
+            // Fix log file ownership — root-level service runs leave logs owned by root,
+            // which prevents the user-level service from writing and causes brew to report errors.
+            $logFile = BREW_PREFIX . '/var/log/' . $service . '.log';
+            $realUser = getenv('BERKAN_SUDO_USER') ?: (getenv('SUDO_USER') ?: user());
+
+            if ($realUser && file_exists($logFile)) {
+                $this->cli->quietly("chown {$realUser} " . escapeshellarg($logFile));
+                // Truncate stale root error messages
+                file_put_contents($logFile, '');
+            }
+        }
+    }
+
+    /**
+     * Build a brew services command that runs as the real user, not root.
+     */
+    protected function userBrewCommand(string $action, string $service): string
+    {
+        $brewBin = $this->brew->brewBin();
+        $realUser = getenv('BERKAN_SUDO_USER') ?: (getenv('SUDO_USER') ?: user());
+
+        if (posix_getuid() === 0 && $realUser) {
+            return "sudo -u {$realUser} {$brewBin} services {$action} {$service}";
+        }
+
+        return "{$brewBin} services {$action} {$service}";
     }
 
     /**

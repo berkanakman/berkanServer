@@ -66,7 +66,14 @@ class DnsMasq
             $contents = $this->files->get($dnsmasqConf);
 
             if (! str_contains($contents, $includeLine)) {
-                $this->files->append($dnsmasqConf, PHP_EOL . $includeLine . PHP_EOL);
+                // Remove any stale Berkan conf-dir entries before appending
+                $lines = array_filter(explode("\n", $contents), function ($line) {
+                    $trimmed = trim($line);
+
+                    return $trimmed === '' || ! str_starts_with($trimmed, 'conf-dir=');
+                });
+
+                $this->files->put($dnsmasqConf, implode("\n", $lines) . PHP_EOL . $includeLine . PHP_EOL);
             }
         } else {
             $this->files->put($dnsmasqConf, $includeLine . PHP_EOL);

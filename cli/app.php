@@ -139,57 +139,92 @@ $app->command('install', function (InputInterface $input, OutputInterface $outpu
     // ============================================================
     // 4. Port conflict detection
     // ============================================================
+
+    // Stop existing Berkan services first so they don't cause false port conflicts
+    $webServerClass = $webServer === 'nginx' ? \Berkan\Nginx::class : \Berkan\Apache::class;
+    if (resolve(\Berkan\Brew::class)->installed($webServer === 'nginx' ? 'nginx' : 'httpd')) {
+        resolve($webServerClass)->stop();
+    }
+
     $httpPort = '80';
     $httpsPort = '443';
 
-    $port80InUse = trim($cli->run('lsof -ti :80 2>/dev/null'));
-    $port443InUse = trim($cli->run('lsof -ti :443 2>/dev/null'));
+    // Helper to check if a port is in use
+    $isPortInUse = function (string $port) use ($cli) {
+        return trim($cli->run("lsof -ti :{$port} 2>/dev/null"));
+    };
+
+    // Helper to find the next available port starting from a given port
+    $findFreePort = function (int $startPort, array $exclude = []) use ($isPortInUse) {
+        $port = $startPort;
+        while ($port <= 65535) {
+            if (! in_array((string) $port, $exclude, true) && empty($isPortInUse((string) $port))) {
+                return (string) $port;
+            }
+            $port++;
+        }
+        return (string) $startPort;
+    };
+
+    $port80InUse = $isPortInUse('80');
+    $port443InUse = $isPortInUse('443');
 
     if (! empty($port80InUse) || ! empty($port443InUse)) {
         output('');
         warning('Port conflict detected!');
 
         if (! empty($port80InUse)) {
-            warning("  Port 80 is in use (PID: {$port80InUse})");
+            $processName80 = trim($cli->run("ps -p {$port80InUse} -o comm= 2>/dev/null"));
+            warning("  Port 80 is in use by {$processName80} (PID: {$port80InUse})");
         }
         if (! empty($port443InUse)) {
-            warning("  Port 443 is in use (PID: {$port443InUse})");
+            $processName443 = trim($cli->run("ps -p {$port443InUse} -o comm= 2>/dev/null"));
+            warning("  Port 443 is in use by {$processName443} (PID: {$port443InUse})");
         }
 
         output('');
 
+        // Find available alternative ports
+        $altHttp = $findFreePort(8080);
+        $altHttps = $findFreePort(8443, [$altHttp]);
+
+        $choices = [
+            "Use default ports anyway (80/443) — stop conflicting services manually",
+            "Use available ports ({$altHttp}/{$altHttps})",
+            'Enter custom ports',
+        ];
+
         $portQuestion = new ChoiceQuestion(
             'How would you like to resolve the port conflict?',
-            [
-                'Use default ports anyway (80/443) — stop conflicting services manually',
-                'Use alternative ports (8080/8443)',
-                'Use alternative ports (8888/8843)',
-                'Enter custom ports',
-            ],
-            0
+            $choices,
+            1
         );
         $portChoice = $helper->ask($input, $output, $portQuestion);
 
-        if ($portChoice === 'Use alternative ports (8080/8443)') {
-            $httpPort = '8080';
-            $httpsPort = '8443';
-        } elseif ($portChoice === 'Use alternative ports (8888/8843)') {
-            $httpPort = '8888';
-            $httpsPort = '8843';
+        if ($portChoice === $choices[1]) {
+            $httpPort = $altHttp;
+            $httpsPort = $altHttps;
         } elseif ($portChoice === 'Enter custom ports') {
-            $portValidator = function ($value) {
+            $portValidator = function ($value) use ($isPortInUse, $cli) {
                 $port = (int) $value;
                 if (! ctype_digit((string) $value) || $port < 1 || $port > 65535) {
                     throw new \RuntimeException('Port must be a number between 1 and 65535.');
                 }
+
+                $pid = $isPortInUse((string) $port);
+                if (! empty($pid)) {
+                    $process = trim($cli->run("ps -p {$pid} -o comm= 2>/dev/null"));
+                    throw new \RuntimeException("Port {$port} is already in use by {$process} (PID: {$pid}).");
+                }
+
                 return (string) $port;
             };
 
-            $httpPortQ = new \Symfony\Component\Console\Question\Question('  HTTP port [80]: ', '80');
+            $httpPortQ = new \Symfony\Component\Console\Question\Question("  HTTP port [{$altHttp}]: ", $altHttp);
             $httpPortQ->setValidator($portValidator);
             $httpPort = $helper->ask($input, $output, $httpPortQ);
 
-            $httpsPortQ = new \Symfony\Component\Console\Question\Question('  HTTPS port [443]: ', '443');
+            $httpsPortQ = new \Symfony\Component\Console\Question\Question("  HTTPS port [{$altHttps}]: ", $altHttps);
             $httpsPortQ->setValidator($portValidator);
             $httpsPort = $helper->ask($input, $output, $httpsPortQ);
         }
@@ -210,6 +245,9 @@ $app->command('install', function (InputInterface $input, OutputInterface $outpu
 
     // Install web server
     resolve(\Berkan\Contracts\WebServer::class)->install();
+
+    // Rebuild existing site VirtualHost configs with current port settings
+    resolve(\Berkan\Site::class)->rebuildSiteConfigs();
 
     // ============================================================
     // 6. Install PHP versions
@@ -312,6 +350,7 @@ $app->command('start', function () {
     resolve(\Berkan\PhpFpm::class)->start();
     resolve(\Berkan\Contracts\WebServer::class)->start();
     resolve(\Berkan\DnsMasq::class)->restart();
+    resolve(\Berkan\Database::class)->start();
 
     info('Berkan services have been started.');
 })->descriptions('Start the Berkan services');
@@ -325,6 +364,7 @@ $app->command('stop', function () {
     resolve(\Berkan\Contracts\WebServer::class)->stop();
     resolve(\Berkan\PhpFpm::class)->stop();
     resolve(\Berkan\DnsMasq::class)->stop();
+    resolve(\Berkan\Database::class)->stop();
 
     info('Berkan services have been stopped.');
 })->descriptions('Stop the Berkan services');
@@ -338,6 +378,7 @@ $app->command('restart', function () {
     resolve(\Berkan\PhpFpm::class)->restart();
     resolve(\Berkan\Contracts\WebServer::class)->restart();
     resolve(\Berkan\DnsMasq::class)->restart();
+    resolve(\Berkan\Database::class)->restart();
 
     info('Berkan services have been restarted.');
 })->descriptions('Restart the Berkan services');
@@ -484,17 +525,22 @@ $app->command('links', function () {
 
     $config = resolve(\Berkan\Configuration::class)->read();
     $tld = $config['tld'];
+    $httpPort = $config['http_port'] ?? '80';
+    $httpsPort = $config['https_port'] ?? '443';
     $site = resolve(\Berkan\Site::class);
     $secured = $site->secured();
     $defaultPhp = $config['php_versions'][0] ?? 'php';
 
-    table(['Site', 'SSL', 'URL', 'Path', 'PHP'], $links->map(function ($path, $name) use ($tld, $site, $secured, $defaultPhp) {
+    table(['Site', 'SSL', 'URL', 'Path', 'PHP'], $links->map(function ($path, $name) use ($tld, $httpPort, $httpsPort, $site, $secured, $defaultPhp) {
         $ssl = $secured->contains($name . '.' . $tld) ? 'X' : '';
         $protocol = $ssl ? 'https' : 'http';
+        $portSuffix = $ssl
+            ? ($httpsPort !== '443' ? ':' . $httpsPort : '')
+            : ($httpPort !== '80' ? ':' . $httpPort : '');
         $isolated = $site->phpVersion($name);
         $php = $isolated ? str_replace(['php@', 'php'], '', $isolated) : $defaultPhp;
 
-        return [$name, $ssl, "{$protocol}://{$name}.{$tld}", $path, $php];
+        return [$name, $ssl, "{$protocol}://{$name}.{$tld}{$portSuffix}", $path, $php];
     })->values()->all());
 })->descriptions('Display all linked sites');
 
@@ -514,11 +560,16 @@ $app->command('unlink [name]', function ($name = null) {
  */
 $app->command('open [name]', function ($name = null) {
     $name = strtolower($name ?: basename(getcwd()));
-    $tld = resolve(\Berkan\Configuration::class)->read()['tld'];
+    $config = resolve(\Berkan\Configuration::class)->read();
+    $tld = $config['tld'];
     $secured = resolve(\Berkan\Site::class)->secured();
-    $protocol = $secured->contains($name . '.' . $tld) ? 'https' : 'http';
+    $isSecure = $secured->contains($name . '.' . $tld);
+    $protocol = $isSecure ? 'https' : 'http';
+    $portSuffix = $isSecure
+        ? (($config['https_port'] ?? '443') !== '443' ? ':' . $config['https_port'] : '')
+        : (($config['http_port'] ?? '80') !== '80' ? ':' . $config['http_port'] : '');
 
-    $url = escapeshellarg("{$protocol}://{$name}.{$tld}");
+    $url = escapeshellarg("{$protocol}://{$name}.{$tld}{$portSuffix}");
     resolve(\Berkan\CommandLine::class)->runAsUser("open {$url}");
 })->descriptions('Open the site in your browser');
 
