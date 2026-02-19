@@ -20,12 +20,7 @@ class Magento2BerkanDriver extends BerkanDriver
      */
     public function isStaticFile(string $sitePath, string $siteName, string $uri)
     {
-        if (file_exists($staticFilePath = $sitePath . '/pub' . $uri)
-            && ! is_dir($staticFilePath)) {
-            return $staticFilePath;
-        }
-
-        return false;
+        return $this->validStaticFilePath($sitePath . '/pub' . $uri, $sitePath);
     }
 
     /**

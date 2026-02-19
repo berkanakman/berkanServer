@@ -826,6 +826,16 @@ $app->command('proxy name url [--secure]', function ($name, $url, $secure) {
     }
 
     resolve(\Berkan\Site::class)->proxyCreate($name, $url, $secure);
+
+    $config = resolve(\Berkan\Configuration::class)->read();
+    $tld = $config['tld'];
+    $protocol = $secure ? 'https' : 'http';
+    $port = $secure ? ($config['https_port'] ?? '443') : ($config['http_port'] ?? '80');
+    $defaultPort = $secure ? '443' : '80';
+    $portSuffix = $port !== $defaultPort ? ':' . $port : '';
+
+    info("Proxy [{$name}] created, forwarding to [{$url}].");
+    info("Site available at: {$protocol}://{$name}.{$tld}{$portSuffix}");
 })->descriptions('Create a proxy site');
 
 /**
@@ -975,6 +985,12 @@ $app->command('loopback [address]', function ($address = null) {
     if ($address) {
         if (! filter_var($address, FILTER_VALIDATE_IP)) {
             warning("Invalid IP address: {$address}");
+            return;
+        }
+
+        // Only allow loopback addresses (127.x.x.x range)
+        if (! str_starts_with($address, '127.')) {
+            warning("Address [{$address}] is not a loopback address. Only 127.x.x.x addresses are allowed.");
             return;
         }
 
@@ -1247,6 +1263,8 @@ $app->command('server:switch', function (InputInterface $input, OutputInterface 
  * Toggle error display.
  */
 $app->command('error action', function ($action) {
+    should_be_sudo();
+
     $config = resolve(\Berkan\Configuration::class);
     $phpFpm = resolve(\Berkan\PhpFpm::class);
 

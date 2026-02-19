@@ -237,6 +237,10 @@ class Brew
     {
         $resolvedLink = $this->files->readLink(BREW_PREFIX . '/bin/php');
 
+        if ($resolvedLink === false) {
+            throw new \DomainException('Unable to determine linked PHP. The symlink at ' . BREW_PREFIX . '/bin/php could not be resolved.');
+        }
+
         foreach (static::SUPPORTED_PHP_VERSIONS as $phpVersion) {
             if (str_contains($resolvedLink, '/' . $phpVersion . '/') || str_contains($resolvedLink, '/' . str_replace('@', '/', $phpVersion) . '/')) {
                 return $phpVersion;

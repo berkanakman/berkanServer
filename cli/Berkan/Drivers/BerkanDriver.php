@@ -99,6 +99,23 @@ abstract class BerkanDriver
     }
 
     /**
+     * Validate that a static file path is within the site directory.
+     *
+     * @return string|false
+     */
+    protected function validStaticFilePath(string $filePath, string $sitePath)
+    {
+        $realFilePath = realpath($filePath);
+        $realSitePath = realpath($sitePath);
+
+        if ($realFilePath && $realSitePath && strpos($realFilePath, $realSitePath . '/') === 0 && ! is_dir($realFilePath)) {
+            return $realFilePath;
+        }
+
+        return false;
+    }
+
+    /**
      * Mutate the incoming URI.
      */
     public function mutateUri(string $uri): string

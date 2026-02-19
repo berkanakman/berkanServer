@@ -22,12 +22,7 @@ class ContaoBerkanDriver extends BerkanDriver
     {
         $publicDir = $this->getPublicDir($sitePath);
 
-        if (file_exists($staticFilePath = $sitePath . $publicDir . $uri)
-            && ! is_dir($staticFilePath)) {
-            return $staticFilePath;
-        }
-
-        return false;
+        return $this->validStaticFilePath($sitePath . $publicDir . $uri, $sitePath);
     }
 
     /**

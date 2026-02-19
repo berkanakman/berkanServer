@@ -21,12 +21,7 @@ class SculpinBerkanDriver extends BerkanDriver
     {
         $outputDir = $this->getOutputDir($sitePath);
 
-        if (file_exists($staticFilePath = $sitePath . $outputDir . $uri)
-            && ! is_dir($staticFilePath)) {
-            return $staticFilePath;
-        }
-
-        return false;
+        return $this->validStaticFilePath($sitePath . $outputDir . $uri, $sitePath);
     }
 
     /**

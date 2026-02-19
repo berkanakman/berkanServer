@@ -177,7 +177,7 @@ class Filesystem
     /**
      * Read the target of the given symlink.
      */
-    public function readLink(string $path): string
+    public function readLink(string $path): string|false
     {
         return readlink($path);
     }
@@ -193,7 +193,7 @@ class Filesystem
     /**
      * Resolve the given symbolic link.
      */
-    public function realpath(string $path): string
+    public function realpath(string $path): string|false
     {
         return realpath($path);
     }
