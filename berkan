@@ -110,15 +110,25 @@ case "$1" in
         ;;
 
     *)
+        # Commands that always need sudo
+        NEEDS_SUDO=false
         if [ "$1" = "install" ] || [ "$1" = "uninstall" ] || [ "$1" = "trust" ] || \
            [ "$1" = "start" ] || [ "$1" = "stop" ] || [ "$1" = "restart" ] || \
            [ "$1" = "secure" ] || [ "$1" = "unsecure" ] || [ "$1" = "use" ] || \
-           [ "$1" = "proxy" ] || [ "$1" = "unproxy" ] || [ "$1" = "tld" ] || \
-           [ "$1" = "loopback" ] || [ "$1" = "park" ] || \
+           [ "$1" = "proxy" ] || [ "$1" = "unproxy" ] || [ "$1" = "park" ] || \
            [ "$1" = "php:install" ] || [ "$1" = "php:remove" ] || \
            [ "$1" = "db:install" ] || [ "$1" = "db:uninstall" ] || \
            [ "$1" = "db:start" ] || [ "$1" = "db:stop" ] || [ "$1" = "db:restart" ] || \
            [ "$1" = "server:switch" ]; then
+            NEEDS_SUDO=true
+        fi
+
+        # Commands that need sudo only when setting a value (with argument)
+        if { [ "$1" = "tld" ] || [ "$1" = "loopback" ]; } && [ -n "$2" ]; then
+            NEEDS_SUDO=true
+        fi
+
+        if [ "$NEEDS_SUDO" = true ]; then
             if [ "$(id -u)" -eq 0 ]; then
                 $PHP "$DIR/cli/berkan.php" "$@"
             else
