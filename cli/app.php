@@ -177,10 +177,20 @@ $app->command('install', function (InputInterface $input, OutputInterface $outpu
             $httpPort = '8888';
             $httpsPort = '8843';
         } elseif ($portChoice === 'Enter custom ports') {
+            $portValidator = function ($value) {
+                $port = (int) $value;
+                if (! ctype_digit((string) $value) || $port < 1 || $port > 65535) {
+                    throw new \RuntimeException('Port must be a number between 1 and 65535.');
+                }
+                return (string) $port;
+            };
+
             $httpPortQ = new \Symfony\Component\Console\Question\Question('  HTTP port [80]: ', '80');
+            $httpPortQ->setValidator($portValidator);
             $httpPort = $helper->ask($input, $output, $httpPortQ);
 
             $httpsPortQ = new \Symfony\Component\Console\Question\Question('  HTTPS port [443]: ', '443');
+            $httpsPortQ->setValidator($portValidator);
             $httpsPort = $helper->ask($input, $output, $httpsPortQ);
         }
 

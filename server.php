@@ -94,7 +94,7 @@ if (! file_exists($frontControllerPath)) {
 
 // Set up the server environment
 $_SERVER['SERVER_NAME'] = $serverName;
-$_SERVER['SCRIPT_NAME'] = '/index.php';
+$_SERVER['SCRIPT_NAME'] = '/' . basename($frontControllerPath);
 $_SERVER['PHP_SELF'] = $uri;
 $_SERVER['DOCUMENT_ROOT'] = $sitePath;
 $_SERVER['SCRIPT_FILENAME'] = $frontControllerPath;

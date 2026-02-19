@@ -12,8 +12,6 @@ class Apache implements WebServer
     public Configuration $config;
     public Site $site;
 
-    const APACHE_CONF = '/opt/httpd/etc/httpd/httpd.conf';
-
     /**
      * Create a new Apache instance.
      */

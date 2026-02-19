@@ -2,8 +2,6 @@
 
 namespace Berkan;
 
-use Berkan\Drivers\BerkanDriver;
-
 class Server
 {
     protected static $configCache = null;
@@ -117,11 +115,4 @@ class Server
         }
     }
 
-    /**
-     * Determine the appropriate driver for the request.
-     */
-    public static function findDriver(string $sitePath, string $siteName, string $uri): ?BerkanDriver
-    {
-        return BerkanDriver::assign($sitePath, $siteName, $uri);
-    }
 }
