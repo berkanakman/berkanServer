@@ -6,6 +6,8 @@ use Berkan\Drivers\BerkanDriver;
 
 class Server
 {
+    protected static $configCache = null;
+
     /**
      * Determine the site and URI from the request.
      */
@@ -25,8 +27,13 @@ class Server
         $config = static::loadConfig();
         $tld = $config['tld'] ?? 'test';
 
-        // Remove the TLD from the host
-        $siteName = str_replace('.' . $tld, '', $serverName);
+        // Remove the trailing TLD from the host
+        $suffix = '.' . $tld;
+        if (substr($serverName, -strlen($suffix)) === $suffix) {
+            $siteName = substr($serverName, 0, -strlen($suffix));
+        } else {
+            $siteName = $serverName;
+        }
 
         // Remove port if present
         $siteName = explode(':', $siteName)[0];
@@ -72,13 +79,17 @@ class Server
      */
     public static function loadConfig(): array
     {
+        if (static::$configCache !== null) {
+            return static::$configCache;
+        }
+
         $configPath = BERKAN_HOME_PATH . '/config.json';
 
         if (! file_exists($configPath)) {
-            return ['tld' => 'test', 'loopback' => '127.0.0.1', 'paths' => []];
+            return static::$configCache = ['tld' => 'test', 'loopback' => '127.0.0.1', 'paths' => []];
         }
 
-        return json_decode(file_get_contents($configPath), true) ?: [];
+        return static::$configCache = json_decode(file_get_contents($configPath), true) ?: [];
     }
 
     /**

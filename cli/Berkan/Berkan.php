@@ -44,8 +44,10 @@ class Berkan
     {
         $this->unlinkFromUsersBin();
 
+        $binPath = BREW_PREFIX . '/bin/berkan';
+
         $this->cli->runAsUser(
-            'ln -s "' . realpath(__DIR__ . '/../../berkan') . '" /usr/local/bin/berkan'
+            'ln -s "' . realpath(__DIR__ . '/../../berkan') . '" ' . $binPath
         );
     }
 
@@ -54,6 +56,8 @@ class Berkan
      */
     public function unlinkFromUsersBin(): void
     {
+        $this->cli->quietly('rm -f ' . BREW_PREFIX . '/bin/berkan');
+        // Also remove legacy location
         $this->cli->quietly('rm -f /usr/local/bin/berkan');
     }
 

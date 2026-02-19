@@ -350,8 +350,7 @@ class Site
         $phpSocket = 'berkan.sock';
         $isolatedVersion = $this->phpVersion($url);
         if ($isolatedVersion) {
-            $versionNum = str_replace(['php@', 'php'], '', $isolatedVersion) ?: $isolatedVersion;
-            $phpSocket = 'berkan-' . $versionNum . '.sock';
+            $phpSocket = basename(resolve(PhpFpm::class)->isolatedSocketPath($isolatedVersion));
         }
 
         $stub = $this->files->get(__DIR__ . '/../stubs/' . $this->stubPrefix() . 'secure.berkan.conf');
@@ -399,8 +398,7 @@ class Site
         $phpSocket = 'berkan.sock';
         $isolatedVersion = $this->phpVersion($url);
         if ($isolatedVersion) {
-            $versionNum = str_replace(['php@', 'php'], '', $isolatedVersion) ?: $isolatedVersion;
-            $phpSocket = 'berkan-' . $versionNum . '.sock';
+            $phpSocket = basename(resolve(PhpFpm::class)->isolatedSocketPath($isolatedVersion));
         }
 
         $stub = $this->files->get(__DIR__ . '/../stubs/' . $this->stubPrefix() . 'site.berkan.conf');

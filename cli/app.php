@@ -346,6 +346,11 @@ $app->command('park [path]', function (InputInterface $input, OutputInterface $o
     $path = $path ?: getcwd();
     $path = realpath($path);
 
+    if (! $path || ! is_dir($path)) {
+        warning('The specified path does not exist or is not a directory.');
+        return;
+    }
+
     $config = resolve(\Berkan\Configuration::class);
     $config->addPath($path);
 
@@ -434,7 +439,7 @@ $app->command('parked', function () {
  */
 $app->command('forget [path]', function ($path = null) {
     $path = $path ?: getcwd();
-    $path = realpath($path);
+    $path = realpath($path) ?: $path;
 
     resolve(\Berkan\Configuration::class)->removePath($path);
 
@@ -550,6 +555,11 @@ $app->command('unsecure [name]', function ($name = null) {
  * Use a specific PHP version.
  */
 $app->command('use [version]', function ($version) {
+    if (! $version) {
+        warning('Please provide a PHP version. Example: berkan use 8.3');
+        return;
+    }
+
     should_be_sudo();
 
     resolve(\Berkan\PhpFpm::class)->useVersion($version);
@@ -561,9 +571,11 @@ $app->command('use [version]', function ($version) {
  */
 $app->command('isolate [phpv]', function ($phpv) {
     if (! $phpv) {
-        warning('Please provide a PHP version. Example: berkan isolate 8.5');
+        warning('Please provide a PHP version. Example: berkan isolate 8.4');
         return;
     }
+
+    should_be_sudo();
 
     $site = strtolower(basename(getcwd()));
 
@@ -601,6 +613,8 @@ $app->command('isolate [phpv]', function ($phpv) {
  * Remove isolation.
  */
 $app->command('unisolate', function () {
+    should_be_sudo();
+
     $site = strtolower(basename(getcwd()));
     $siteManager = resolve(\Berkan\Site::class);
     $version = $siteManager->phpVersion($site);
@@ -845,6 +859,8 @@ $app->command('directory-listing [toggle]', function ($toggle = null) {
     if ($toggle !== null) {
         $enabled = in_array($toggle, ['on', '1', 'true', 'yes']);
         $config->updateKey('directory_listing', $enabled);
+
+        resolve(\Berkan\Contracts\WebServer::class)->restart();
 
         info('Directory listing has been ' . ($enabled ? 'enabled' : 'disabled') . '.');
     } else {
