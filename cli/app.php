@@ -518,9 +518,8 @@ $app->command('open [name]', function ($name = null) {
     $secured = resolve(\Berkan\Site::class)->secured();
     $protocol = $secured->contains($name . '.' . $tld) ? 'https' : 'http';
 
-    resolve(\Berkan\CommandLine::class)->runAsUser(
-        "open {$protocol}://{$name}.{$tld}"
-    );
+    $url = escapeshellarg("{$protocol}://{$name}.{$tld}");
+    resolve(\Berkan\CommandLine::class)->runAsUser("open {$url}");
 })->descriptions('Open the site in your browser');
 
 /**
@@ -749,6 +748,11 @@ $app->command('fetch-share-url', function () {
  * Set Ngrok token.
  */
 $app->command('set-ngrok-token [token]', function ($token) {
+    if (! $token) {
+        warning('Please provide a token. Example: berkan set-ngrok-token YOUR_TOKEN');
+        return;
+    }
+
     resolve(\Berkan\Ngrok::class)->setToken($token);
 })->descriptions('Set the Ngrok auth token');
 
@@ -843,6 +847,11 @@ $app->command('tld [name]', function ($name = null) {
     $config = resolve(\Berkan\Configuration::class);
 
     if ($name) {
+        if (! preg_match('/^[a-zA-Z][a-zA-Z0-9]*$/', $name)) {
+            warning("Invalid TLD: {$name}. Use only letters and numbers, starting with a letter.");
+            return;
+        }
+
         should_be_sudo();
 
         $oldTld = $config->read()['tld'];
@@ -867,7 +876,7 @@ $app->command('directory-listing [toggle]', function ($toggle = null) {
     $config = resolve(\Berkan\Configuration::class);
 
     if ($toggle !== null) {
-        $enabled = in_array($toggle, ['on', '1', 'true', 'yes']);
+        $enabled = in_array(strtolower($toggle), ['on', '1', 'true', 'yes']);
         $config->updateKey('directory_listing', $enabled);
 
         resolve(\Berkan\Contracts\WebServer::class)->restart();
@@ -902,6 +911,11 @@ $app->command('loopback [address]', function ($address = null) {
     $config = resolve(\Berkan\Configuration::class);
 
     if ($address) {
+        if (! filter_var($address, FILTER_VALIDATE_IP)) {
+            warning("Invalid IP address: {$address}");
+            return;
+        }
+
         should_be_sudo();
 
         $config->updateKey('loopback', $address);
@@ -1146,9 +1160,10 @@ $app->command('server:switch', function (InputInterface $input, OutputInterface 
     $config->updateKey('web_server', $newServer);
 
     // Re-resolve the container to get the new server type
-    // We need to clear the resolved instance so it gets re-created
+    // Clear both WebServer and Site singletons so they get re-created
     $container = \Illuminate\Container\Container::getInstance();
     $container->forgetInstance(\Berkan\Contracts\WebServer::class);
+    $container->forgetInstance(\Berkan\Site::class);
 
     // Install the new server
     $webServer = resolve(\Berkan\Contracts\WebServer::class);

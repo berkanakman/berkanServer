@@ -93,16 +93,16 @@ if (! file_exists($frontControllerPath)) {
 }
 
 // Set up the server environment
+// Note: DOCUMENT_ROOT, SCRIPT_NAME, and SCRIPT_FILENAME are set by the
+// driver's frontControllerPath() above — do not overwrite them here.
 $_SERVER['SERVER_NAME'] = $serverName;
-$_SERVER['SCRIPT_NAME'] = '/' . basename($frontControllerPath);
 $_SERVER['PHP_SELF'] = $uri;
-$_SERVER['DOCUMENT_ROOT'] = $sitePath;
-$_SERVER['SCRIPT_FILENAME'] = $frontControllerPath;
 
 // Apply error display setting from config
 $berkanConfig = Server::loadConfig();
 if (! empty($berkanConfig['hide_errors'])) {
-    error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED & ~E_STRICT & ~E_WARNING);
+    error_reporting(0);
+    ini_set('display_errors', '0');
 }
 
 // Change to the site directory for relative path resolution
