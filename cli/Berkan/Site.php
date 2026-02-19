@@ -106,6 +106,9 @@ class Site
         $this->files->ensureDirExists($sitesPath, user());
 
         return collect($this->files->scandir($sitesPath))
+            ->filter(function ($site) {
+                return ! str_ends_with($site, '.proxy');
+            })
             ->mapWithKeys(function ($site) use ($sitesPath) {
                 $realPath = $this->files->isLink($sitesPath . '/' . $site)
                     ? $this->files->readLink($sitesPath . '/' . $site)
@@ -625,13 +628,30 @@ class Site
     public function rebuildSiteConfigs(): void
     {
         $tld = $this->config->read()['tld'] ?? 'test';
+        $secured = $this->secured();
+        $rebuilt = [];
 
         // Rebuild secured site configs
-        foreach ($this->secured() as $fullUrl) {
+        foreach ($secured as $fullUrl) {
             $siteName = str_replace('.' . $tld, '', $fullUrl);
 
             $siteConf = $this->buildSecureServer($siteName);
             $this->webServer()->installSite($siteName, $siteConf);
+            $rebuilt[$siteName] = true;
+        }
+
+        // Rebuild isolated (non-secured) site configs
+        foreach ($this->isolated() as $siteName => $phpVersion) {
+            if (isset($rebuilt[$siteName])) {
+                continue; // Already rebuilt as secured
+            }
+
+            // Only rebuild if the site actually exists (linked or parked)
+            if ($this->getSitePath($siteName) !== '') {
+                $siteConf = $this->buildServer($siteName);
+                $this->webServer()->installSite($siteName, $siteConf);
+                $rebuilt[$siteName] = true;
+            }
         }
 
         // Rebuild proxy site configs

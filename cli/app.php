@@ -174,12 +174,14 @@ $app->command('install', function (InputInterface $input, OutputInterface $outpu
         warning('Port conflict detected!');
 
         if (! empty($port80InUse)) {
-            $processName80 = trim($cli->run("ps -p {$port80InUse} -o comm= 2>/dev/null"));
-            warning("  Port 80 is in use by {$processName80} (PID: {$port80InUse})");
+            $pid80 = strtok($port80InUse, "\n");
+            $processName80 = trim($cli->run("ps -p {$pid80} -o comm= 2>/dev/null"));
+            warning("  Port 80 is in use by {$processName80} (PID: {$pid80})");
         }
         if (! empty($port443InUse)) {
-            $processName443 = trim($cli->run("ps -p {$port443InUse} -o comm= 2>/dev/null"));
-            warning("  Port 443 is in use by {$processName443} (PID: {$port443InUse})");
+            $pid443 = strtok($port443InUse, "\n");
+            $processName443 = trim($cli->run("ps -p {$pid443} -o comm= 2>/dev/null"));
+            warning("  Port 443 is in use by {$processName443} (PID: {$pid443})");
         }
 
         output('');
@@ -506,10 +508,13 @@ $app->command('link [name]', function ($name = null) {
 
     resolve(\Berkan\Site::class)->link($path, $name);
 
-    $tld = resolve(\Berkan\Configuration::class)->read()['tld'];
+    $config = resolve(\Berkan\Configuration::class)->read();
+    $tld = $config['tld'];
+    $httpPort = $config['http_port'] ?? '80';
+    $portSuffix = $httpPort !== '80' ? ':' . $httpPort : '';
 
     info("A [{$name}] symbolic link has been created in [{$path}].");
-    info("Site available at: http://{$name}.{$tld}");
+    info("Site available at: http://{$name}.{$tld}{$portSuffix}");
 })->descriptions('Link the current working directory to Berkan');
 
 /**
@@ -1226,8 +1231,14 @@ $app->command('server:switch', function (InputInterface $input, OutputInterface 
     $webServer = resolve(\Berkan\Contracts\WebServer::class);
     $webServer->install();
 
+    // Rebuild all site VirtualHost configs in the new server's format
+    resolve(\Berkan\Site::class)->rebuildSiteConfigs();
+
     // Update sudoers
     resolve(\Berkan\Berkan::class)->trust();
+
+    // Start the new server
+    $webServer->restart();
 
     info("Successfully switched to " . ucfirst($newServer) . "!");
 })->descriptions('Switch between Apache and Nginx');

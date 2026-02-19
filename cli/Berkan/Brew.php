@@ -204,7 +204,10 @@ class Brew
         }
 
         // Fallback: check if the process is actually running (covers root-level services)
-        $pgrep = trim($this->cli->run('pgrep -f ' . escapeshellarg($service) . ' 2>/dev/null'));
+        // Match against brew's install path to avoid false positives
+        // (e.g. "redis-cli" won't match "/opt/homebrew/opt/redis/bin/redis-server")
+        $brewOptPath = BREW_PREFIX . '/opt/' . $service;
+        $pgrep = trim($this->cli->run('pgrep -f ' . escapeshellarg($brewOptPath) . ' 2>/dev/null'));
 
         return ! empty($pgrep);
     }
