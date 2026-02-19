@@ -17,7 +17,9 @@ class BasicWithPublicBerkanDriver extends BerkanDriver
      */
     public function isStaticFile(string $sitePath, string $siteName, string $uri)
     {
-        if (file_exists($staticFilePath = $sitePath . '/public' . $uri) && ! is_dir($staticFilePath)) {
+        $staticFilePath = realpath($sitePath . '/public' . $uri);
+
+        if ($staticFilePath && strpos($staticFilePath, realpath($sitePath)) === 0 && ! is_dir($staticFilePath)) {
             return $staticFilePath;
         }
 

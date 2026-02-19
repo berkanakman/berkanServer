@@ -10,6 +10,15 @@ use Illuminate\Container\Container;
 use Symfony\Component\Console\Output\ConsoleOutput;
 
 /**
+ * Polyfill for str_contains (PHP 8.0+).
+ */
+if (! function_exists('str_contains')) {
+    function str_contains(string $haystack, string $needle): bool {
+        return strpos($haystack, $needle) !== false;
+    }
+}
+
+/**
  * Define the Berkan constants.
  */
 define('BERKAN_LOOPBACK', '127.0.0.1');

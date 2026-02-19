@@ -17,7 +17,9 @@ class BasicBerkanDriver extends BerkanDriver
      */
     public function isStaticFile(string $sitePath, string $siteName, string $uri)
     {
-        if (file_exists($staticFilePath = $sitePath . $uri) && ! is_dir($staticFilePath)) {
+        $staticFilePath = realpath($sitePath . $uri);
+
+        if ($staticFilePath && strpos($staticFilePath, realpath($sitePath)) === 0 && ! is_dir($staticFilePath)) {
             return $staticFilePath;
         }
 
@@ -29,6 +31,8 @@ class BasicBerkanDriver extends BerkanDriver
      */
     public function frontControllerPath(string $sitePath, string $siteName, string $uri): string
     {
+        $realSitePath = realpath($sitePath);
+
         $candidates = [
             $sitePath . $uri,
             $sitePath . '/index.php',
@@ -36,12 +40,14 @@ class BasicBerkanDriver extends BerkanDriver
         ];
 
         foreach ($candidates as $candidate) {
-            if (file_exists($candidate) && ! is_dir($candidate)) {
-                $_SERVER['SCRIPT_FILENAME'] = $candidate;
-                $_SERVER['SCRIPT_NAME'] = str_replace($sitePath, '', $candidate);
-                $_SERVER['DOCUMENT_ROOT'] = $sitePath;
+            $realCandidate = realpath($candidate);
 
-                return $candidate;
+            if ($realCandidate && strpos($realCandidate, $realSitePath) === 0 && ! is_dir($realCandidate)) {
+                $_SERVER['SCRIPT_FILENAME'] = $realCandidate;
+                $_SERVER['SCRIPT_NAME'] = str_replace($realSitePath, '', $realCandidate);
+                $_SERVER['DOCUMENT_ROOT'] = $realSitePath;
+
+                return $realCandidate;
             }
         }
 

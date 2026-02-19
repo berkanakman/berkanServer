@@ -629,12 +629,19 @@ class Site
                 return str_replace(['.' . $oldTld . '.crt'], '', $file);
             });
 
-        foreach ($secured as $url) {
-            $this->unsecure($url);
+        // Remove old certificates and configs using the OLD TLD directly
+        // (unsecure() reads TLD from config which is already updated to newTld)
+        $certsPath = $this->certificatesPath();
+        foreach ($secured as $siteName) {
+            $oldFullUrl = $siteName . '.' . $oldTld;
+
+            $this->removeCertificate($oldFullUrl);
+            $this->removeWebServerConfig($siteName);
         }
 
-        foreach ($secured as $url) {
-            $this->secure($url);
+        // Now secure all sites with the NEW TLD (config already has newTld)
+        foreach ($secured as $siteName) {
+            $this->secure($siteName);
         }
     }
 
