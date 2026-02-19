@@ -44,7 +44,7 @@ class Expose
         $domain = $url . '.' . $tld;
 
         $this->cli->passthru(
-            "expose share {$domain}:80"
+            'expose share ' . escapeshellarg($domain . ':80')
         );
     }
 }

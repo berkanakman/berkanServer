@@ -41,7 +41,7 @@ class Ngrok
      */
     public function setToken(string $token): void
     {
-        $this->cli->runAsUser("ngrok authtoken {$token}");
+        $this->cli->runAsUser('ngrok authtoken ' . escapeshellarg($token));
         info('Ngrok auth token has been set.');
     }
 
@@ -53,7 +53,7 @@ class Ngrok
         $domain = $url . '.' . $tld;
 
         $this->cli->passthru(
-            "ngrok http --host-header=rewrite {$domain}:80"
+            'ngrok http --host-header=rewrite ' . escapeshellarg($domain . ':80')
         );
     }
 }

@@ -32,6 +32,11 @@ class CommandLine
         if (posix_getuid() === 0) {
             $user = user();
             $userInfo = posix_getpwnam($user);
+
+            if ($userInfo === false) {
+                throw new \RuntimeException("User '{$user}' not found in system.");
+            }
+
             $uid = (int) $userInfo['uid'];
             $gid = (int) $userInfo['gid'];
             $home = $userInfo['dir'];

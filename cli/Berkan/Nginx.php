@@ -190,7 +190,7 @@ class Nginx implements WebServer
     public function rewriteSecureFiles(): void
     {
         $config = $this->config->read();
-        $tld = $config['tld'];
+        $tld = $config['tld'] ?? 'test';
 
         $this->site->resecureForNewTld($tld, $tld);
     }

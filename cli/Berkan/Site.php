@@ -318,7 +318,6 @@ class Site
         $certsPath = $this->certificatesPath();
 
         $this->files->unlink($certsPath . '/' . $url . '.key');
-        $this->files->unlink($certsPath . '/' . $url . '.csr');
         $this->files->unlink($certsPath . '/' . $url . '.crt');
         $this->files->unlink($certsPath . '/' . $url . '.conf');
 
