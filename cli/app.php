@@ -763,6 +763,12 @@ $app->command('proxy name url [--secure]', function ($name, $url, $secure) {
     should_be_sudo();
 
     $name = strtolower($name);
+
+    if (! filter_var($url, FILTER_VALIDATE_URL)) {
+        warning("Invalid proxy URL: {$url}. Provide a valid URL (e.g. http://127.0.0.1:3000).");
+        return;
+    }
+
     resolve(\Berkan\Site::class)->proxyCreate($name, $url, $secure);
 })->descriptions('Create a proxy site');
 

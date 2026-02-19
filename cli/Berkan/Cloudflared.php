@@ -24,7 +24,7 @@ class Cloudflared
         $domain = $url . '.' . $tld;
 
         $this->cli->passthru(
-            "cloudflared tunnel --url http://{$domain}:80"
+            'cloudflared tunnel --url ' . escapeshellarg('http://' . $domain . ':80')
         );
     }
 
