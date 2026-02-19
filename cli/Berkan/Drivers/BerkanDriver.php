@@ -14,7 +14,7 @@ abstract class BerkanDriver
      *
      * @return string|false
      */
-    abstract public function isStaticFile(string $sitePath, string $siteName, string $uri): string|false;
+    abstract public function isStaticFile(string $sitePath, string $siteName, string $uri);
 
     /**
      * Get the fully resolved path to the application's front controller.
@@ -24,7 +24,10 @@ abstract class BerkanDriver
     /**
      * Find a driver that can serve the incoming request.
      */
-    public static function assign(string $sitePath, string $siteName, string $uri): ?static
+    /**
+     * @return static|null
+     */
+    public static function assign(string $sitePath, string $siteName, string $uri)
     {
         $dominated = static::driversIn(BERKAN_HOME_PATH . '/Drivers');
         $specific = static::driversIn(__DIR__ . '/Specific');

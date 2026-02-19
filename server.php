@@ -12,8 +12,37 @@ define('BERKAN_HOME_PATH', $_SERVER['HOME'] . '/.config/berkan');
 define('BERKAN_SERVER_PATH', __DIR__);
 define('BERKAN_STATIC_PREFIX', '/41c270e4-5535-4daa-b23e-c269e73c6c01');
 
-// Load autoloader
-require_once __DIR__ . '/vendor/autoload.php';
+// Polyfills for PHP 7.x compatibility
+if (! function_exists('str_starts_with')) {
+    function str_starts_with(string $haystack, string $needle): bool
+    {
+        return strncmp($haystack, $needle, strlen($needle)) === 0;
+    }
+}
+
+if (! function_exists('str_ends_with')) {
+    function str_ends_with(string $haystack, string $needle): bool
+    {
+        if ($needle === '') {
+            return true;
+        }
+        return substr($haystack, -strlen($needle)) === $needle;
+    }
+}
+
+if (! function_exists('str_contains')) {
+    function str_contains(string $haystack, string $needle): bool
+    {
+        return strpos($haystack, $needle) !== false;
+    }
+}
+
+// Load only the Berkan classes needed at runtime (no Composer autoloader)
+// This ensures compatibility with older PHP versions (7.x) used by isolated sites
+require_once __DIR__ . '/cli/Berkan/Server.php';
+require_once __DIR__ . '/cli/Berkan/Drivers/BerkanDriver.php';
+require_once __DIR__ . '/cli/Berkan/Drivers/BasicWithPublicBerkanDriver.php';
+require_once __DIR__ . '/cli/Berkan/Drivers/BasicBerkanDriver.php';
 
 use Berkan\Server;
 use Berkan\Drivers\BerkanDriver;
@@ -69,6 +98,12 @@ $_SERVER['SCRIPT_NAME'] = '/index.php';
 $_SERVER['PHP_SELF'] = $uri;
 $_SERVER['DOCUMENT_ROOT'] = $sitePath;
 $_SERVER['SCRIPT_FILENAME'] = $frontControllerPath;
+
+// Apply error display setting from config
+$berkanConfig = Server::loadConfig();
+if (! empty($berkanConfig['hide_errors'])) {
+    error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED & ~E_STRICT & ~E_WARNING);
+}
 
 // Change to the site directory for relative path resolution
 chdir(dirname($frontControllerPath));

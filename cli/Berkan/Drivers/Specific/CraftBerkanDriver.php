@@ -17,7 +17,7 @@ class CraftBerkanDriver extends BerkanDriver
     /**
      * Determine if the incoming request is for a static file.
      */
-    public function isStaticFile(string $sitePath, string $siteName, string $uri): string|false
+    public function isStaticFile(string $sitePath, string $siteName, string $uri)
     {
         if (file_exists($staticFilePath = $sitePath . '/web' . $uri)
             && ! is_dir($staticFilePath)) {

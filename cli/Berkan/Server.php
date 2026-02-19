@@ -40,7 +40,7 @@ class Server
     public static function sitePath(string $siteName): string
     {
         $config = static::loadConfig();
-        $homePath = $_SERVER['HOME'] . Configuration::BERKAN_HOME_PATH;
+        $homePath = BERKAN_HOME_PATH;
 
         // Check linked sites first
         $linkPath = $homePath . '/Sites/' . $siteName;
@@ -72,7 +72,7 @@ class Server
      */
     public static function loadConfig(): array
     {
-        $configPath = $_SERVER['HOME'] . Configuration::BERKAN_HOME_PATH . '/config.json';
+        $configPath = BERKAN_HOME_PATH . '/config.json';
 
         if (! file_exists($configPath)) {
             return ['tld' => 'test', 'loopback' => '127.0.0.1', 'paths' => []];

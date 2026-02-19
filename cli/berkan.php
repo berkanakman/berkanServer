@@ -31,6 +31,15 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
 }
 
 /**
+ * Load CLI helper functions.
+ *
+ * These are loaded here (not via Composer autoload files) to avoid
+ * conflicting with framework helpers (e.g. Laravel's resolve, tap, info)
+ * when server.php includes the Composer autoloader during web requests.
+ */
+require_once __DIR__ . '/includes/helpers.php';
+
+/**
  * Create the application container.
  */
 $container = Container::getInstance();

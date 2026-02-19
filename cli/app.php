@@ -371,23 +371,46 @@ $app->command('park [path]', function (InputInterface $input, OutputInterface $o
     info("Found " . count($projects) . " projects in [{$path}]:");
     output('');
 
+    // Ask if user wants to set PHP version for all projects at once
+    $bulkChoices = array_merge(['Ask individually'], $phpChoices);
+    $bulkQuestion = new ChoiceQuestion(
+        '  Set PHP version for all projects, or ask individually?',
+        $bulkChoices,
+        0
+    );
+    $bulkChoice = $helper->ask($input, $output, $bulkQuestion);
+    output('');
+
+    $phpVersionsToRestart = [];
+
     foreach ($projects as $project) {
-        $question = new ChoiceQuestion(
-            "  {$project['name']} [{$project['framework']}] — PHP version?",
-            $phpChoices,
-            0
-        );
-        $choice = $helper->ask($input, $output, $question);
+        if ($bulkChoice === 'Ask individually') {
+            $question = new ChoiceQuestion(
+                "  {$project['name']} [{$project['framework']}] — PHP version?",
+                $phpChoices,
+                0
+            );
+            $choice = $helper->ask($input, $output, $question);
+        } else {
+            $choice = $bulkChoice;
+        }
 
         if ($choice !== 'Default (global PHP)') {
             $phpVersion = ($choice === 'latest') ? 'php' : 'php@' . $choice;
-            $site->isolate($project['name'], $phpVersion);
-            resolve(\Berkan\PhpFpm::class)->isolateVersion($phpVersion);
+            $isBulk = $bulkChoice !== 'Ask individually';
+            $site->isolate($project['name'], $phpVersion, $isBulk);
+            $phpVersionsToRestart[$phpVersion] = true;
         }
     }
 
+    output('');
+    $phpFpm = resolve(\Berkan\PhpFpm::class);
+    foreach (array_keys($phpVersionsToRestart) as $phpVersion) {
+        $phpFpm->isolateVersion($phpVersion);
+    }
+
     resolve(\Berkan\Contracts\WebServer::class)->restart();
-    info("Path [{$path}] has been parked with project configurations.");
+    info("Path [{$path}] has been parked with " . count($projects) . " projects.");
 })->descriptions('Register a directory as a parked path for Berkan');
 
 /**
@@ -444,14 +467,19 @@ $app->command('links', function () {
         return;
     }
 
-    $tld = resolve(\Berkan\Configuration::class)->read()['tld'];
+    $config = resolve(\Berkan\Configuration::class)->read();
+    $tld = $config['tld'];
+    $site = resolve(\Berkan\Site::class);
+    $secured = $site->secured();
+    $defaultPhp = $config['php_versions'][0] ?? 'php';
 
-    table(['Site', 'SSL', 'URL', 'Path'], $links->map(function ($path, $name) use ($tld) {
-        $secured = resolve(\Berkan\Site::class)->secured();
+    table(['Site', 'SSL', 'URL', 'Path', 'PHP'], $links->map(function ($path, $name) use ($tld, $site, $secured, $defaultPhp) {
         $ssl = $secured->contains($name . '.' . $tld) ? 'X' : '';
         $protocol = $ssl ? 'https' : 'http';
+        $isolated = $site->phpVersion($name);
+        $php = $isolated ? str_replace(['php@', 'php'], '', $isolated) : $defaultPhp;
 
-        return [$name, $ssl, "{$protocol}://{$name}.{$tld}", $path];
+        return [$name, $ssl, "{$protocol}://{$name}.{$tld}", $path, $php];
     })->values()->all());
 })->descriptions('Display all linked sites');
 
@@ -531,26 +559,72 @@ $app->command('use [version]', function ($version) {
 /**
  * Isolate a site to use a specific PHP version.
  */
-$app->command('isolate [version]', function ($version) {
-    $site = basename(getcwd());
+$app->command('isolate [phpv]', function ($phpv) {
+    if (! $phpv) {
+        warning('Please provide a PHP version. Example: berkan isolate 8.5');
+        return;
+    }
 
-    resolve(\Berkan\Site::class)->isolate($site, $version);
-    resolve(\Berkan\PhpFpm::class)->isolateVersion($version);
+    $site = strtolower(basename(getcwd()));
+
+    // Normalize version input to Homebrew formula format
+    // e.g. "8.5.3" → "php@8.5", "8.5" → "php@8.5", "7.3" → "php@7.3", "latest" → "php"
+    $phpv = str_replace(['php@', 'php'], '', $phpv);
+    if ($phpv === '' || $phpv === 'latest') {
+        $phpVersion = 'php';
+    } else {
+        // Strip patch version: "8.5.3" → "8.5"
+        $parts = explode('.', $phpv);
+        $majorMinor = $parts[0] . '.' . ($parts[1] ?? '0');
+        $phpVersion = 'php@' . $majorMinor;
+    }
+
+    $siteManager = resolve(\Berkan\Site::class);
+    $siteManager->isolate($site, $phpVersion);
+    resolve(\Berkan\PhpFpm::class)->isolateVersion($phpVersion);
+
+    // Regenerate vhost config with the isolated PHP-FPM socket
+    $tld = resolve(\Berkan\Configuration::class)->read()['tld'];
+    $secured = $siteManager->secured();
+
+    if ($secured->contains($site . '.' . $tld)) {
+        $siteConf = $siteManager->buildSecureServer($site);
+    } else {
+        $siteConf = $siteManager->buildServer($site);
+    }
+
+    resolve(\Berkan\Contracts\WebServer::class)->installSite($site, $siteConf);
+    resolve(\Berkan\Contracts\WebServer::class)->restart();
 })->descriptions('Isolate the current site to use a specific PHP version');
 
 /**
  * Remove isolation.
  */
 $app->command('unisolate', function () {
-    $site = basename(getcwd());
-    $version = resolve(\Berkan\Site::class)->phpVersion($site);
+    $site = strtolower(basename(getcwd()));
+    $siteManager = resolve(\Berkan\Site::class);
+    $version = $siteManager->phpVersion($site);
 
-    if ($version) {
-        resolve(\Berkan\Site::class)->removeIsolation($site);
-        resolve(\Berkan\PhpFpm::class)->removeIsolation($version);
-    } else {
+    if (! $version) {
         info('This site is not isolated.');
+        return;
     }
+
+    $siteManager->removeIsolation($site);
+    resolve(\Berkan\PhpFpm::class)->removeIsolation($version);
+
+    // Regenerate vhost config with the default PHP-FPM socket
+    $tld = resolve(\Berkan\Configuration::class)->read()['tld'];
+    $secured = $siteManager->secured();
+
+    if ($secured->contains($site . '.' . $tld)) {
+        $siteConf = $siteManager->buildSecureServer($site);
+    } else {
+        $siteConf = $siteManager->buildServer($site);
+    }
+
+    resolve(\Berkan\Contracts\WebServer::class)->installSite($site, $siteConf);
+    resolve(\Berkan\Contracts\WebServer::class)->restart();
 })->descriptions('Remove PHP version isolation from the current site');
 
 /**
@@ -660,6 +734,7 @@ $app->command('set-ngrok-token [token]', function ($token) {
 $app->command('proxy name url [--secure]', function ($name, $url, $secure) {
     should_be_sudo();
 
+    $name = strtolower($name);
     resolve(\Berkan\Site::class)->proxyCreate($name, $url, $secure);
 })->descriptions('Create a proxy site');
 
@@ -687,6 +762,7 @@ $app->command('proxies', function () {
 $app->command('unproxy name', function ($name) {
     should_be_sudo();
 
+    $name = strtolower($name);
     resolve(\Berkan\Site::class)->proxyDelete($name);
 })->descriptions('Remove a proxy site');
 
@@ -1057,5 +1133,25 @@ $app->command('server:switch', function (InputInterface $input, OutputInterface 
 
     info("Successfully switched to " . ucfirst($newServer) . "!");
 })->descriptions('Switch between Apache and Nginx');
+
+/**
+ * Toggle error display.
+ */
+$app->command('error action', function ($action) {
+    $config = resolve(\Berkan\Configuration::class);
+    $phpFpm = resolve(\Berkan\PhpFpm::class);
+
+    if ($action === 'hide' || $action === 'show') {
+        $config->updateKey('hide_errors', $action === 'hide');
+
+        // Ensure prepend file and FPM pool configs are up to date
+        $phpFpm->installPrependFile();
+        $phpFpm->ensurePrependInPools();
+
+        info('PHP errors are now ' . ($action === 'hide' ? 'hidden' : 'visible') . '.');
+    } else {
+        warning('Usage: berkan error hide|show');
+    }
+})->descriptions('Toggle PHP error display (hide/show)');
 
 return $app;

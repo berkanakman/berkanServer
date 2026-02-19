@@ -17,7 +17,7 @@ class DrupalBerkanDriver extends BerkanDriver
     /**
      * Determine if the incoming request is for a static file.
      */
-    public function isStaticFile(string $sitePath, string $siteName, string $uri): string|false
+    public function isStaticFile(string $sitePath, string $siteName, string $uri)
     {
         if (file_exists($staticFilePath = $sitePath . $uri)
             && ! is_dir($staticFilePath)) {

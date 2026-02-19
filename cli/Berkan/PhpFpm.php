@@ -46,8 +46,56 @@ class PhpFpm
 
         $this->files->ensureDirExists($this->config->homePath() . '/Log', user());
 
+        $this->installPrependFile();
         $this->installConfiguration();
         $this->restart();
+    }
+
+    /**
+     * Install the Berkan prepend file for error display control.
+     */
+    public function installPrependFile(): void
+    {
+        $source = __DIR__ . '/../stubs/berkan_prepend.php';
+        $destination = $this->config->homePath() . '/berkan_prepend.php';
+
+        if ($this->files->exists($source)) {
+            $this->files->putAsUser($destination, $this->files->get($source));
+        }
+    }
+
+    /**
+     * Ensure all active FPM pool configs have the auto_prepend_file directive.
+     */
+    public function ensurePrependInPools(): void
+    {
+        $prependPath = $this->config->homePath() . '/berkan_prepend.php';
+        $prependLine = 'php_admin_value[auto_prepend_file] = ' . $prependPath;
+
+        foreach ($this->brew->supportedPhpVersions() as $formula) {
+            $versionNumber = str_replace(['php@', 'php'], '', $formula) ?: $this->brew->getPhpVersion($formula);
+
+            $configs = [
+                BREW_PREFIX . '/etc/php/' . $versionNumber . '/php-fpm.d/berkan-fpm.conf',
+                BREW_PREFIX . '/etc/php/' . $versionNumber . '/php-fpm.d/berkan-isolated-fpm.conf',
+            ];
+
+            foreach ($configs as $configFile) {
+                if ($this->files->exists($configFile)) {
+                    $content = $this->files->get($configFile);
+                    if (strpos($content, 'auto_prepend_file') === false) {
+                        $this->files->put($configFile, $content . "\n" . $prependLine . "\n");
+                    }
+                }
+            }
+        }
+
+        // Restart all running PHP-FPM services
+        foreach ($this->brew->supportedPhpVersions() as $formula) {
+            if ($this->brew->isStartedService($formula)) {
+                $this->brew->restartService($formula);
+            }
+        }
     }
 
     /**

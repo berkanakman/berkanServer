@@ -651,7 +651,7 @@ class Site
     /**
      * Isolate a site to use a specific PHP version.
      */
-    public function isolate(string $site, string $phpVersion): void
+    public function isolate(string $site, string $phpVersion, bool $silent = false): void
     {
         $config = $this->config->read();
 
@@ -662,8 +662,10 @@ class Site
         $config['isolated_versions'][$site] = $phpVersion;
         $this->config->write($config);
 
-        $displayVersion = str_replace(['php@', 'php'], '', $phpVersion) ?: 'latest';
-        info("Site [{$site}] is now using PHP {$displayVersion}.");
+        if (! $silent) {
+            $displayVersion = str_replace(['php@', 'php'], '', $phpVersion) ?: 'latest';
+            info("Site [{$site}] is now using PHP {$displayVersion}.");
+        }
     }
 
     /**

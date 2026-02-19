@@ -15,9 +15,9 @@ class BasicBerkanDriver extends BerkanDriver
     /**
      * Determine if the incoming request is for a static file.
      */
-    public function isStaticFile(string $sitePath, string $siteName, string $uri): string|false
+    public function isStaticFile(string $sitePath, string $siteName, string $uri)
     {
-        if (file_exists($staticFilePath = $sitePath . $uri)) {
+        if (file_exists($staticFilePath = $sitePath . $uri) && ! is_dir($staticFilePath)) {
             return $staticFilePath;
         }
 
@@ -30,9 +30,9 @@ class BasicBerkanDriver extends BerkanDriver
     public function frontControllerPath(string $sitePath, string $siteName, string $uri): string
     {
         $candidates = [
+            $sitePath . $uri,
             $sitePath . '/index.php',
             $sitePath . '/index.html',
-            $sitePath . $uri,
         ];
 
         foreach ($candidates as $candidate) {

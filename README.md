@@ -34,6 +34,7 @@
   - [Custom Drivers](#custom-drivers)
   - [Supported Frameworks](#supported-frameworks)
   - [Configuration](#configuration)
+  - [Error Display Control](#error-display-control)
   - [Logs & Diagnostics](#logs--diagnostics)
   - [Architecture](#architecture)
   - [Troubleshooting](#troubleshooting)
@@ -55,6 +56,7 @@
   - [Özel Driver Yazma](#özel-driver-yazma)
   - [Desteklenen Framework'ler](#desteklenen-frameworkler)
   - [Konfigürasyon](#konfigürasyon)
+  - [Hata Görüntüleme Kontrolü](#hata-görüntüleme-kontrolü)
   - [Log ve Tanı](#log-ve-tanı)
   - [Mimari](#mimari)
   - [Sorun Giderme](#sorun-giderme)
@@ -129,6 +131,13 @@ Berkan lets you choose between **Apache** and **Nginx** during installation, and
 - `berkan composer` - run Composer with the correct PHP binary
 - Automatic **PHP-FPM pool configuration** with Unix socket (`berkan.sock`)
 - Memory limit, upload size, and execution time tuned for development (512 MB, no timeout)
+
+### Error Display Control
+
+- **Toggle PHP error display** with `berkan error hide` / `berkan error show`
+- Uses PHP-FPM `auto_prepend_file` for reliable per-request error control
+- Works consistently across all sites, including those with `.htaccess` rewrites and PHP version isolation
+- Settings persist in `config.json` and take effect immediately without restart
 
 ### Database Management
 
@@ -464,7 +473,7 @@ That's it. Every folder inside `~/Sites/` is now automatically available as `htt
 | `berkan parked` | List all parked directories |
 | `berkan forget [path]` | Remove a parked path |
 | `berkan link [name]` | Create a symbolic link for the current directory |
-| `berkan links` | List all linked sites with SSL status and URLs |
+| `berkan links` | List all linked sites with SSL status, URLs, and PHP version |
 | `berkan unlink [name]` | Remove a linked site |
 | `berkan open [name]` | Open site in default browser |
 | `berkan paths` | Display all registered paths |
@@ -534,6 +543,8 @@ That's it. Every folder inside `~/Sites/` is now automatically available as `htt
 | `berkan tld [name]` | Get or set the TLD (default: `test`) |
 | `berkan loopback [address]` | Get or set the loopback IP (default: `127.0.0.1`) |
 | `berkan directory-listing [on/off]` | Toggle directory listing |
+| `berkan error hide` | Hide PHP errors (notices, warnings, deprecations) on all sites |
+| `berkan error show` | Show PHP errors on all sites |
 | `berkan on-latest-version` | Display current Berkan version |
 
 ### Diagnostics
@@ -617,12 +628,12 @@ berkan link mysite
 berkan links
 
 # Output:
-# +--------+-----+---------------------+-------------------------------+
-# | Site   | SSL | URL                 | Path                          |
-# +--------+-----+---------------------+-------------------------------+
-# | mysite |     | http://mysite.test  | /Users/you/some/deep/nested.. |
-# | blog   | X   | https://blog.test   | /Users/you/Sites/blog         |
-# +--------+-----+---------------------+-------------------------------+
+# +--------+-----+---------------------+-------------------------------+------+
+# | Site   | SSL | URL                 | Path                          | PHP  |
+# +--------+-----+---------------------+-------------------------------+------+
+# | mysite |     | http://mysite.test  | /Users/you/some/deep/nested.. | 8.4  |
+# | blog   | X   | https://blog.test   | /Users/you/Sites/blog         | 7.4  |
+# +--------+-----+---------------------+-------------------------------+------+
 ```
 
 ```bash
@@ -632,12 +643,23 @@ berkan unlink mysite
 
 ### How Request Routing Works
 
-1. A request for `myapp.test` arrives at your web server (Apache or Nginx)
-2. The catch-all server configuration routes it to `server.php`
-3. `server.php` extracts the site name from the hostname
-4. It looks for a matching linked site or parked directory
+**Apache:**
+1. A request for `myapp.test` arrives at Apache
+2. The site's `.htaccess` rewrite rules run first (if any)
+3. If no `.htaccess` rule matched, Berkan's fallback rule routes unmatched requests to `server.php` (via `RewriteOptions InheritDown`)
+4. `server.php` extracts the site name from the hostname
 5. The driver system auto-detects the framework (Laravel, WordPress, etc.)
 6. The appropriate front controller is loaded and executed
+
+**Nginx:**
+1. A request for `myapp.test` arrives at Nginx
+2. The server block routes it to `server.php`
+3. `server.php` extracts the site name from the hostname
+4. It looks for a matching linked site or parked directory
+5. The driver system auto-detects the framework
+6. The appropriate front controller is loaded and executed
+
+> **Note:** Apache uses `RewriteOptions InheritDown` so that your project's `.htaccess` rules always take priority over Berkan's fallback routing. This means traditional PHP sites with custom rewrite rules (e.g., multilingual routing like `/tr/subeler.php`) work natively without modification.
 
 ## HTTPS / SSL
 
@@ -989,7 +1011,10 @@ class MyCustomBerkanDriver extends BerkanDriver
      * Determine if the incoming request is for a static file.
      * Return the full file path, or false if not a static file.
      */
-    public function isStaticFile(string $sitePath, string $siteName, string $uri): string|false
+    /**
+     * @return string|false
+     */
+    public function isStaticFile(string $sitePath, string $siteName, string $uri)
     {
         $staticPath = $sitePath . '/public' . $uri;
 
@@ -1013,6 +1038,8 @@ class MyCustomBerkanDriver extends BerkanDriver
     }
 }
 ```
+
+> **Note:** The `isStaticFile()` method omits the return type declaration for compatibility with PHP 7.x isolated sites. Use a `@return` docblock instead.
 
 ### Driver Resolution Order
 
@@ -1075,7 +1102,8 @@ The main configuration file is at `~/.config/berkan/config.json`:
     "isolated_versions": {
         "legacy-app": "php@7.4",
         "old-wordpress": "php@5.6"
-    }
+    },
+    "hide_errors": false
 }
 ```
 
@@ -1090,6 +1118,7 @@ The main configuration file is at `~/.config/berkan/config.json`:
 | `php_versions` | Installed PHP versions | `["8.4"]` |
 | `databases` | Installed databases | `[]` |
 | `isolated_versions` | Per-site PHP version assignments | `{}` |
+| `hide_errors` | Hide PHP errors on all sites (`berkan error hide/show`) | `false` |
 
 ### Configuration Directories
 
@@ -1105,6 +1134,7 @@ The main configuration file is at `~/.config/berkan/config.json`:
 | `~/.config/berkan/dnsmasq.d/` | DnsMasq TLD configuration |
 | `~/.config/berkan/berkan.sock` | PHP-FPM Unix socket (global/default) |
 | `~/.config/berkan/berkan-7.4.sock` | Isolated PHP-FPM socket (example: PHP 7.4) |
+| `~/.config/berkan/berkan_prepend.php` | PHP auto-prepend file for error display control |
 
 ### System Files
 
@@ -1139,6 +1169,27 @@ sudo berkan loopback 10.200.10.1
 berkan loopback
 # Output: 10.200.10.1
 ```
+
+## Error Display Control
+
+Berkan can globally hide or show PHP errors (notices, warnings, deprecations, etc.) across all your sites:
+
+```bash
+# Hide PHP errors on all sites
+berkan error hide
+
+# Show PHP errors again
+berkan error show
+```
+
+This uses PHP-FPM's `auto_prepend_file` mechanism, which injects a small script (`berkan_prepend.php`) before every PHP request. The script reads the `hide_errors` setting from `config.json` and suppresses error display accordingly.
+
+This approach works reliably across all scenarios:
+- Sites using `.htaccess` rewrite rules
+- Sites isolated to different PHP versions (PHP 7.x, 8.x)
+- Sites served via `server.php` fallback router
+
+The setting takes effect immediately for new requests without requiring a service restart.
 
 ## Logs & Diagnostics
 
@@ -1216,14 +1267,17 @@ Browser (myapp.test)
    Apache or Nginx             Listens on 127.0.0.1:80/443
         |
         v
-   server.php                  Request router
+   .htaccess rules             (Apache only) Site's own rewrite rules run first
+        |
+        v
+   server.php                  Fallback request router (unmatched requests)
         |
         v
    Driver System               Auto-detects framework
         |
         v
    PHP-FPM                     Executes PHP via Unix socket
-        |
+        |                      (auto_prepend_file for error control)
         v
    Your Application            Laravel, WordPress, etc.
 ```
@@ -1244,8 +1298,8 @@ server/
 │   ├── stubs/                # Configuration templates
 │   │   ├── httpd.conf        # Apache main config
 │   │   ├── berkan.conf       # Apache default catch-all VirtualHost
-│   │   ├── site.berkan.conf  # Apache per-site VirtualHost
-│   │   ├── secure.berkan.conf # Apache HTTPS VirtualHost
+│   │   ├── site.berkan.conf  # Apache per-site VirtualHost (InheritDown)
+│   │   ├── secure.berkan.conf # Apache HTTPS VirtualHost (InheritDown)
 │   │   ├── proxy.berkan.conf  # Apache proxy VirtualHost
 │   │   ├── secure.proxy.berkan.conf # Apache secure proxy
 │   │   ├── nginx.conf         # Nginx main config
@@ -1254,7 +1308,9 @@ server/
 │   │   ├── nginx-secure.berkan.conf # Nginx HTTPS server
 │   │   ├── nginx-proxy.berkan.conf  # Nginx proxy server
 │   │   ├── nginx-secure.proxy.berkan.conf # Nginx secure proxy
+│   │   ├── etc-phpfpm-berkan.conf  # PHP-FPM pool template
 │   │   ├── etc-phpfpm-berkan-isolated.conf # Isolated PHP-FPM pool template
+│   │   ├── berkan_prepend.php # PHP auto-prepend for error display control
 │   │   └── ...               # More templates
 │   ├── templates/
 │   │   └── 404.html          # Custom 404 page
@@ -1501,6 +1557,13 @@ Berkan, kurulum sırasında **Apache** veya **Nginx** arasında seçim yapmanız
 - `berkan composer` - doğru PHP binary'si ile Composer çalıştırma
 - Unix soket (`berkan.sock`) ile otomatik **PHP-FPM havuz yapılandırması**
 - Geliştirme için ayarlanmış bellek limiti, yükleme boyutu ve çalışma süresi (512 MB, zaman aşımı yok)
+
+### Hata Görüntüleme Kontrolü
+
+- `berkan error hide` / `berkan error show` ile **PHP hata görüntülemesini açıp kapatın**
+- Güvenilir istek bazlı hata kontrolü için PHP-FPM `auto_prepend_file` kullanır
+- `.htaccess` rewrite kuralları ve PHP versiyon izolasyonu olan siteler dahil tüm sitelerde tutarlı çalışır
+- Ayarlar `config.json`'da saklanır ve yeniden başlatma gerekmeden anında etki eder
 
 ### Veritabanı Yönetimi
 
@@ -1836,7 +1899,7 @@ Bu kadar! `~/Sites/` içindeki her klasör artık otomatik olarak `http://klasor
 | `berkan parked` | Tüm park edilmiş dizinleri listele |
 | `berkan forget [yol]` | Park edilmiş yolu kaldır |
 | `berkan link [isim]` | Mevcut dizin için sembolik bağlantı oluştur |
-| `berkan links` | Tüm bağlantılı siteleri SSL durumu ve URL'leriyle listele |
+| `berkan links` | Tüm bağlantılı siteleri SSL durumu, URL'leri ve PHP versiyonlarıyla listele |
 | `berkan unlink [isim]` | Bağlantılı siteyi kaldır |
 | `berkan open [isim]` | Siteyi varsayılan tarayıcıda aç |
 | `berkan paths` | Tüm kayıtlı yolları göster |
@@ -1906,6 +1969,8 @@ Bu kadar! `~/Sites/` içindeki her klasör artık otomatik olarak `http://klasor
 | `berkan tld [isim]` | TLD'yi al veya ayarla (varsayılan: `test`) |
 | `berkan loopback [adres]` | Loopback IP'yi al veya ayarla (varsayılan: `127.0.0.1`) |
 | `berkan directory-listing [on/off]` | Dizin listelemeyi aç/kapat |
+| `berkan error hide` | Tüm sitelerde PHP hatalarını gizle (notice, warning, deprecation) |
+| `berkan error show` | Tüm sitelerde PHP hatalarını göster |
 | `berkan on-latest-version` | Mevcut Berkan versiyonunu göster |
 
 ### Tanı
@@ -1989,12 +2054,12 @@ berkan link sitelerim
 berkan links
 
 # Çıktı:
-# +-----------+-----+------------------------+-------------------------------+
-# | Site      | SSL | URL                    | Path                          |
-# +-----------+-----+------------------------+-------------------------------+
-# | sitelerim |     | http://sitelerim.test  | /Users/siz/çok/derin/iç/iç... |
-# | blog      | X   | https://blog.test      | /Users/siz/Sites/blog         |
-# +-----------+-----+------------------------+-------------------------------+
+# +-----------+-----+------------------------+-------------------------------+------+
+# | Site      | SSL | URL                    | Path                          | PHP  |
+# +-----------+-----+------------------------+-------------------------------+------+
+# | sitelerim |     | http://sitelerim.test  | /Users/siz/çok/derin/iç/iç... | 8.4  |
+# | blog      | X   | https://blog.test      | /Users/siz/Sites/blog         | 7.4  |
+# +-----------+-----+------------------------+-------------------------------+------+
 ```
 
 ```bash
@@ -2004,12 +2069,23 @@ berkan unlink sitelerim
 
 ### İstek Yönlendirme Nasıl Çalışır?
 
-1. `myapp.test` için bir istek web sunucunuza ulaşır (Apache veya Nginx)
-2. Catch-all sunucu konfigürasyonu isteği `server.php`'ye yönlendirir
-3. `server.php` ana bilgisayar adından site adını çıkarır
-4. Eşleşen bağlantılı site veya park edilmiş dizini arar
+**Apache:**
+1. `myapp.test` için bir istek Apache'ye ulaşır
+2. Sitenin `.htaccess` rewrite kuralları önce çalışır (varsa)
+3. Hiçbir `.htaccess` kuralı eşleşmediyse, Berkan'ın yedek kuralı eşleşmeyen istekleri `server.php`'ye yönlendirir (`RewriteOptions InheritDown` ile)
+4. `server.php` ana bilgisayar adından site adını çıkarır
 5. Driver sistemi framework'ü otomatik algılar (Laravel, WordPress, vb.)
 6. Uygun ön denetleyici (front controller) yüklenir ve çalıştırılır
+
+**Nginx:**
+1. `myapp.test` için bir istek Nginx'e ulaşır
+2. Server bloğu isteği `server.php`'ye yönlendirir
+3. `server.php` ana bilgisayar adından site adını çıkarır
+4. Eşleşen bağlantılı site veya park edilmiş dizini arar
+5. Driver sistemi framework'ü otomatik algılar
+6. Uygun ön denetleyici yüklenir ve çalıştırılır
+
+> **Not:** Apache, projenizin `.htaccess` kurallarının Berkan'ın yedek yönlendirmesinden her zaman öncelikli olmasını sağlamak için `RewriteOptions InheritDown` kullanır. Bu sayede özel rewrite kuralları olan geleneksel PHP siteleri (ör. çokdilli yönlendirme `/tr/subeler.php`) herhangi bir değişiklik yapılmadan doğal olarak çalışır.
 
 ## HTTPS / SSL Desteği
 
@@ -2361,7 +2437,10 @@ class BenimOzelBerkanDriver extends BerkanDriver
      * Gelen isteğin statik bir dosya için olup olmadığını belirler.
      * Tam dosya yolunu veya statik değilse false döndürün.
      */
-    public function isStaticFile(string $sitePath, string $siteName, string $uri): string|false
+    /**
+     * @return string|false
+     */
+    public function isStaticFile(string $sitePath, string $siteName, string $uri)
     {
         $staticPath = $sitePath . '/public' . $uri;
 
@@ -2385,6 +2464,8 @@ class BenimOzelBerkanDriver extends BerkanDriver
     }
 }
 ```
+
+> **Not:** `isStaticFile()` metodu PHP 7.x izole sitelerle uyumluluk için return type bildirimi içermez. Bunun yerine `@return` docblock kullanın.
 
 ### Driver Çözümleme Sırası
 
@@ -2447,7 +2528,8 @@ Ana konfigürasyon dosyası `~/.config/berkan/config.json` adresindedir:
     "isolated_versions": {
         "eski-proje": "php@7.4",
         "eski-wordpress": "php@5.6"
-    }
+    },
+    "hide_errors": false
 }
 ```
 
@@ -2462,6 +2544,7 @@ Ana konfigürasyon dosyası `~/.config/berkan/config.json` adresindedir:
 | `php_versions` | Kurulu PHP versiyonları | `["8.4"]` |
 | `databases` | Kurulu veritabanları | `[]` |
 | `isolated_versions` | Site bazlı PHP versiyon atamaları | `{}` |
+| `hide_errors` | Tüm sitelerde PHP hatalarını gizle (`berkan error hide/show`) | `false` |
 
 ### Konfigürasyon Dizinleri
 
@@ -2477,6 +2560,7 @@ Ana konfigürasyon dosyası `~/.config/berkan/config.json` adresindedir:
 | `~/.config/berkan/dnsmasq.d/` | DnsMasq TLD konfigürasyonu |
 | `~/.config/berkan/berkan.sock` | PHP-FPM Unix soketi (global/varsayılan) |
 | `~/.config/berkan/berkan-7.4.sock` | İzole PHP-FPM soketi (örnek: PHP 7.4) |
+| `~/.config/berkan/berkan_prepend.php` | Hata görüntüleme kontrolü için PHP auto-prepend dosyası |
 
 ### Sistem Dosyaları
 
@@ -2511,6 +2595,27 @@ sudo berkan loopback 10.200.10.1
 berkan loopback
 # Çıktı: 10.200.10.1
 ```
+
+## Hata Görüntüleme Kontrolü
+
+Berkan, tüm sitelerinizde PHP hatalarını (notice, warning, deprecation, vb.) toplu olarak gizleyip gösterebilir:
+
+```bash
+# Tüm sitelerde PHP hatalarını gizle
+berkan error hide
+
+# PHP hatalarını tekrar göster
+berkan error show
+```
+
+Bu özellik PHP-FPM'in `auto_prepend_file` mekanizmasını kullanır. Her PHP isteğinden önce küçük bir script (`berkan_prepend.php`) enjekte edilir. Script, `config.json`'daki `hide_errors` ayarını okur ve hata görüntülemeyi buna göre bastırır.
+
+Bu yaklaşım tüm senaryolarda güvenilir şekilde çalışır:
+- `.htaccess` rewrite kuralları kullanan siteler
+- Farklı PHP versiyonlarına izole edilmiş siteler (PHP 7.x, 8.x)
+- `server.php` yedek yönlendirici üzerinden sunulan siteler
+
+Ayar, servis yeniden başlatma gerektirmeden yeni istekler için anında etki eder.
 
 ## Log ve Tanı
 
@@ -2588,14 +2693,17 @@ Tarayıcı (myapp.test)
    Apache veya Nginx           127.0.0.1:80/443 dinler
         |
         v
-   server.php                  İstek yönlendirici
+   .htaccess kuralları         (Yalnızca Apache) Sitenin kendi rewrite kuralları önce çalışır
+        |
+        v
+   server.php                  Yedek istek yönlendirici (eşleşmeyen istekler)
         |
         v
    Driver Sistemi              Framework'ü otomatik algılar
         |
         v
    PHP-FPM                     Unix soketi üzerinden PHP çalıştırır
-        |
+        |                      (hata kontrolü için auto_prepend_file)
         v
    Uygulamanız                 Laravel, WordPress, vb.
 ```
@@ -2616,8 +2724,8 @@ server/
 │   ├── stubs/                # Konfigürasyon şablonları
 │   │   ├── httpd.conf        # Apache ana konfig
 │   │   ├── berkan.conf       # Apache varsayılan catch-all VirtualHost
-│   │   ├── site.berkan.conf  # Apache site bazlı VirtualHost
-│   │   ├── secure.berkan.conf # Apache HTTPS VirtualHost
+│   │   ├── site.berkan.conf  # Apache site bazlı VirtualHost (InheritDown)
+│   │   ├── secure.berkan.conf # Apache HTTPS VirtualHost (InheritDown)
 │   │   ├── proxy.berkan.conf  # Apache proxy VirtualHost
 │   │   ├── secure.proxy.berkan.conf # Apache güvenli proxy
 │   │   ├── nginx.conf         # Nginx ana konfig
@@ -2626,7 +2734,9 @@ server/
 │   │   ├── nginx-secure.berkan.conf # Nginx HTTPS sunucu
 │   │   ├── nginx-proxy.berkan.conf  # Nginx proxy sunucu
 │   │   ├── nginx-secure.proxy.berkan.conf # Nginx güvenli proxy
+│   │   ├── etc-phpfpm-berkan.conf  # PHP-FPM havuz şablonu
 │   │   ├── etc-phpfpm-berkan-isolated.conf # İzole PHP-FPM havuz şablonu
+│   │   ├── berkan_prepend.php # Hata görüntüleme kontrolü için PHP auto-prepend
 │   │   └── ...               # Daha fazla şablon
 │   ├── templates/
 │   │   └── 404.html          # Özel 404 sayfası
