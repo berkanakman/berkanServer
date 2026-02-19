@@ -114,7 +114,7 @@ case "$1" in
            [ "$1" = "start" ] || [ "$1" = "stop" ] || [ "$1" = "restart" ] || \
            [ "$1" = "secure" ] || [ "$1" = "unsecure" ] || [ "$1" = "use" ] || \
            [ "$1" = "proxy" ] || [ "$1" = "unproxy" ] || [ "$1" = "tld" ] || \
-           [ "$1" = "loopback" ] || \
+           [ "$1" = "loopback" ] || [ "$1" = "park" ] || \
            [ "$1" = "php:install" ] || [ "$1" = "php:remove" ] || \
            [ "$1" = "db:install" ] || [ "$1" = "db:uninstall" ] || \
            [ "$1" = "db:start" ] || [ "$1" = "db:stop" ] || [ "$1" = "db:restart" ] || \

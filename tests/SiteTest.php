@@ -126,6 +126,23 @@ class SiteTest extends TestCase
         $this->assertFalse($parked->has('not-a-dir.txt'));
     }
 
+    public function test_parked_skips_hidden_directories(): void
+    {
+        $parkPath = $this->tempDir . '/Sites';
+        mkdir($parkPath);
+        mkdir($parkPath . '/project-a');
+        mkdir($parkPath . '/.git');
+        mkdir($parkPath . '/.idea');
+
+        $this->config->addPath($parkPath);
+
+        $parked = $this->site->parked();
+
+        $this->assertTrue($parked->has('project-a'));
+        $this->assertFalse($parked->has('.git'));
+        $this->assertFalse($parked->has('.idea'));
+    }
+
     public function test_parked_skips_nonexistent_paths(): void
     {
         $this->config->addPath('/nonexistent/path');
@@ -368,6 +385,22 @@ class SiteTest extends TestCase
 
         $projects = $this->site->scanProjects($path);
         $this->assertCount(0, $projects);
+    }
+
+    public function test_scan_projects_skips_hidden_directories(): void
+    {
+        $path = $this->tempDir . '/Sites';
+        mkdir($path . '/project1', 0755, true);
+        mkdir($path . '/.git', 0755, true);
+        mkdir($path . '/.hidden', 0755, true);
+
+        $projects = $this->site->scanProjects($path);
+
+        $this->assertCount(1, $projects);
+        $names = array_column($projects, 'name');
+        $this->assertContains('project1', $names);
+        $this->assertNotContains('.git', $names);
+        $this->assertNotContains('.hidden', $names);
     }
 
     public function test_scan_projects_includes_full_path(): void

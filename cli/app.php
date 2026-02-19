@@ -565,7 +565,8 @@ $app->command('isolated', function () {
     }
 
     table(['Site', 'PHP Version'], array_map(function ($version, $site) {
-        return [$site, $version];
+        $displayVersion = str_replace(['php@', 'php'], '', $version) ?: 'latest';
+        return [$site, $displayVersion];
     }, $isolated, array_keys($isolated)));
 })->descriptions('Display all isolated sites');
 

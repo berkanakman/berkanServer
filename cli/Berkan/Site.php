@@ -6,7 +6,7 @@ use Berkan\Contracts\WebServer;
 
 class Site
 {
-    public WebServer $webServer;
+    public ?WebServer $webServer = null;
     public Configuration $config;
     public CommandLine $cli;
     public Filesystem $files;
@@ -27,6 +27,18 @@ class Site
     public function setWebServer(WebServer $webServer): void
     {
         $this->webServer = $webServer;
+    }
+
+    /**
+     * Get the WebServer instance, resolving lazily if needed.
+     */
+    protected function webServer(): WebServer
+    {
+        if (! $this->webServer) {
+            $this->webServer = resolve(WebServer::class);
+        }
+
+        return $this->webServer;
     }
 
     /**
@@ -111,6 +123,10 @@ class Site
         $projects = [];
 
         foreach ($this->files->scandir($path) as $dir) {
+            if (str_starts_with($dir, '.')) {
+                continue;
+            }
+
             $fullPath = $path . '/' . $dir;
 
             if (! $this->files->isDir($fullPath)) {
@@ -160,6 +176,10 @@ class Site
             $dirContents = $this->files->scandir($path);
 
             foreach ($dirContents as $dir) {
+                if (str_starts_with($dir, '.')) {
+                    continue;
+                }
+
                 $fullPath = $path . '/' . $dir;
 
                 if ($this->files->isDir($fullPath)) {
@@ -194,9 +214,9 @@ class Site
         $siteConf = $siteConf ?: $this->buildSecureServer($url);
 
         // Install the configuration
-        $this->webServer->installSite($url, $siteConf);
+        $this->webServer()->installSite($url, $siteConf);
 
-        $this->webServer->restart();
+        $this->webServer()->restart();
 
         info("The [{$url}] site has been secured with a fresh TLS certificate.");
     }
@@ -215,7 +235,7 @@ class Site
         // Remove web server config (it will fall back to catch-all)
         $this->removeWebServerConfig($url);
 
-        $this->webServer->restart();
+        $this->webServer()->restart();
 
         info("The [{$url}] site will now serve traffic over HTTP.");
     }
@@ -512,8 +532,8 @@ class Site
             $host
         );
 
-        $this->webServer->installSite($url, $siteConf);
-        $this->webServer->restart();
+        $this->webServer()->installSite($url, $siteConf);
+        $this->webServer()->restart();
 
         info("Proxy for [{$url}] has been created to [{$host}].");
     }
@@ -530,7 +550,7 @@ class Site
         $fullUrl = $url . '.' . $tld;
         $this->removeCertificate($fullUrl);
 
-        $this->webServer->restart();
+        $this->webServer()->restart();
 
         info("Proxy for [{$url}] has been removed.");
     }
@@ -562,9 +582,7 @@ class Site
      */
     protected function removeWebServerConfig(string $url): void
     {
-        if (isset($this->webServer)) {
-            $this->webServer->removeSite($url);
-        }
+        $this->webServer()->removeSite($url);
     }
 
     /**
@@ -644,7 +662,8 @@ class Site
         $config['isolated_versions'][$site] = $phpVersion;
         $this->config->write($config);
 
-        info("Site [{$site}] is now using PHP {$phpVersion}.");
+        $displayVersion = str_replace(['php@', 'php'], '', $phpVersion) ?: 'latest';
+        info("Site [{$site}] is now using PHP {$displayVersion}.");
     }
 
     /**
