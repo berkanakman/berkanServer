@@ -422,7 +422,7 @@ $app->command('forget [path]', function ($path = null) {
  * Link a site.
  */
 $app->command('link [name]', function ($name = null) {
-    $name = $name ?: basename(getcwd());
+    $name = strtolower($name ?: basename(getcwd()));
     $path = getcwd();
 
     resolve(\Berkan\Site::class)->link($path, $name);
@@ -459,7 +459,7 @@ $app->command('links', function () {
  * Unlink a site.
  */
 $app->command('unlink [name]', function ($name = null) {
-    $name = $name ?: basename(getcwd());
+    $name = strtolower($name ?: basename(getcwd()));
 
     resolve(\Berkan\Site::class)->unlink($name);
 
@@ -470,7 +470,7 @@ $app->command('unlink [name]', function ($name = null) {
  * Open a site in the browser.
  */
 $app->command('open [name]', function ($name = null) {
-    $name = $name ?: basename(getcwd());
+    $name = strtolower($name ?: basename(getcwd()));
     $tld = resolve(\Berkan\Configuration::class)->read()['tld'];
     $secured = resolve(\Berkan\Site::class)->secured();
     $protocol = $secured->contains($name . '.' . $tld) ? 'https' : 'http';
@@ -486,7 +486,7 @@ $app->command('open [name]', function ($name = null) {
 $app->command('secure [name]', function ($name = null) {
     should_be_sudo();
 
-    $name = $name ?: basename(getcwd());
+    $name = strtolower($name ?: basename(getcwd()));
 
     resolve(\Berkan\Site::class)->secure($name);
 })->descriptions('Secure the given site with a trusted TLS certificate');
@@ -513,7 +513,7 @@ $app->command('secured', function () {
 $app->command('unsecure [name]', function ($name = null) {
     should_be_sudo();
 
-    $name = $name ?: basename(getcwd());
+    $name = strtolower($name ?: basename(getcwd()));
 
     resolve(\Berkan\Site::class)->unsecure($name);
 })->descriptions('Remove TLS certificate from the given site');
