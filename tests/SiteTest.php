@@ -536,13 +536,13 @@ class SiteTest extends TestCase
 
         $result = $this->site->buildServer('myapp');
 
-        $this->assertStringNotContainsString('VALET_LOOPBACK', $result);
-        $this->assertStringNotContainsString('VALET_HTTP_PORT', $result);
-        $this->assertStringNotContainsString('VALET_HTTPS_PORT', $result);
-        $this->assertStringNotContainsString('VALET_SITE_PATH', $result);
-        $this->assertStringNotContainsString('VALET_HOME_PATH', $result);
-        $this->assertStringNotContainsString('VALET_SERVER_PATH', $result);
-        $this->assertStringNotContainsString('VALET_PHP_SOCKET', $result);
+        $this->assertStringNotContainsString('BERKAN_LOOPBACK', $result);
+        $this->assertStringNotContainsString('BERKAN_HTTP_PORT', $result);
+        $this->assertStringNotContainsString('BERKAN_HTTPS_PORT', $result);
+        $this->assertStringNotContainsString('BERKAN_SITE_PATH', $result);
+        $this->assertStringNotContainsString('BERKAN_HOME_PATH', $result);
+        $this->assertStringNotContainsString('BERKAN_SERVER_PATH', $result);
+        $this->assertStringNotContainsString('BERKAN_PHP_SOCKET', $result);
         $this->assertStringContainsString('myapp', $result);
         $this->assertStringContainsString('test', $result);
     }
@@ -611,14 +611,14 @@ class SiteTest extends TestCase
 
         $result = $this->site->buildSecureServer('myapp');
 
-        $this->assertStringNotContainsString('VALET_LOOPBACK', $result);
-        $this->assertStringNotContainsString('VALET_HTTP_PORT', $result);
-        $this->assertStringNotContainsString('VALET_HTTPS_PORT', $result);
-        $this->assertStringNotContainsString('VALET_SITE', $result);
-        $this->assertStringNotContainsString('VALET_TLD', $result);
-        $this->assertStringNotContainsString('VALET_CERT', $result);
-        $this->assertStringNotContainsString('VALET_KEY', $result);
-        $this->assertStringNotContainsString('VALET_PHP_SOCKET', $result);
+        $this->assertStringNotContainsString('BERKAN_LOOPBACK', $result);
+        $this->assertStringNotContainsString('BERKAN_HTTP_PORT', $result);
+        $this->assertStringNotContainsString('BERKAN_HTTPS_PORT', $result);
+        $this->assertStringNotContainsString('BERKAN_SITE', $result);
+        $this->assertStringNotContainsString('BERKAN_TLD', $result);
+        $this->assertStringNotContainsString('BERKAN_CERT', $result);
+        $this->assertStringNotContainsString('BERKAN_KEY', $result);
+        $this->assertStringNotContainsString('BERKAN_PHP_SOCKET', $result);
     }
 
     public function test_build_secure_server_uses_custom_ports(): void
@@ -654,11 +654,11 @@ class SiteTest extends TestCase
     {
         $result = $this->site->buildProxyServer('myapi', 'http://localhost:3000');
 
-        $this->assertStringNotContainsString('VALET_LOOPBACK', $result);
-        $this->assertStringNotContainsString('VALET_HTTP_PORT', $result);
-        $this->assertStringNotContainsString('VALET_SITE', $result);
-        $this->assertStringNotContainsString('VALET_TLD', $result);
-        $this->assertStringNotContainsString('VALET_PROXY_HOST', $result);
+        $this->assertStringNotContainsString('BERKAN_LOOPBACK', $result);
+        $this->assertStringNotContainsString('BERKAN_HTTP_PORT', $result);
+        $this->assertStringNotContainsString('BERKAN_SITE', $result);
+        $this->assertStringNotContainsString('BERKAN_TLD', $result);
+        $this->assertStringNotContainsString('BERKAN_PROXY_HOST', $result);
         $this->assertStringContainsString('myapi', $result);
         $this->assertStringContainsString('http://localhost:3000', $result);
     }
@@ -688,14 +688,14 @@ class SiteTest extends TestCase
 
         $result = $this->site->buildSecureProxyServer('myapi', 'http://localhost:3000');
 
-        $this->assertStringNotContainsString('VALET_LOOPBACK', $result);
-        $this->assertStringNotContainsString('VALET_HTTP_PORT', $result);
-        $this->assertStringNotContainsString('VALET_HTTPS_PORT', $result);
-        $this->assertStringNotContainsString('VALET_SITE', $result);
-        $this->assertStringNotContainsString('VALET_TLD', $result);
-        $this->assertStringNotContainsString('VALET_CERT', $result);
-        $this->assertStringNotContainsString('VALET_KEY', $result);
-        $this->assertStringNotContainsString('VALET_PROXY_HOST', $result);
+        $this->assertStringNotContainsString('BERKAN_LOOPBACK', $result);
+        $this->assertStringNotContainsString('BERKAN_HTTP_PORT', $result);
+        $this->assertStringNotContainsString('BERKAN_HTTPS_PORT', $result);
+        $this->assertStringNotContainsString('BERKAN_SITE', $result);
+        $this->assertStringNotContainsString('BERKAN_TLD', $result);
+        $this->assertStringNotContainsString('BERKAN_CERT', $result);
+        $this->assertStringNotContainsString('BERKAN_KEY', $result);
+        $this->assertStringNotContainsString('BERKAN_PROXY_HOST', $result);
     }
 
     public function test_build_secure_proxy_server_uses_custom_ports(): void

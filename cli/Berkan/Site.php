@@ -275,7 +275,7 @@ class Site
 
         // Build OpenSSL config
         $opensslConf = $this->files->get(__DIR__ . '/../stubs/openssl.conf');
-        $opensslConf = str_replace('VALET_CERTIFICATE', $url, $opensslConf);
+        $opensslConf = str_replace('BERKAN_CERTIFICATE', $url, $opensslConf);
         $this->files->put($confPath, $opensslConf);
 
         // Generate private key
@@ -358,17 +358,17 @@ class Site
 
         return str_replace(
             [
-                'VALET_LOOPBACK',
-                'VALET_HTTP_PORT',
-                'VALET_HTTPS_PORT',
-                'VALET_SITE_PATH',
-                'VALET_SERVER_PATH',
-                'VALET_HOME_PATH',
-                'VALET_PHP_SOCKET',
-                'VALET_SITE',
-                'VALET_TLD',
-                'VALET_CERT',
-                'VALET_KEY',
+                'BERKAN_LOOPBACK',
+                'BERKAN_HTTP_PORT',
+                'BERKAN_HTTPS_PORT',
+                'BERKAN_SITE_PATH',
+                'BERKAN_SERVER_PATH',
+                'BERKAN_HOME_PATH',
+                'BERKAN_PHP_SOCKET',
+                'BERKAN_SITE',
+                'BERKAN_TLD',
+                'BERKAN_CERT',
+                'BERKAN_KEY',
             ],
             [
                 $config['loopback'] ?? BERKAN_LOOPBACK,
@@ -407,15 +407,15 @@ class Site
 
         return str_replace(
             [
-                'VALET_LOOPBACK',
-                'VALET_HTTP_PORT',
-                'VALET_HTTPS_PORT',
-                'VALET_SITE_PATH',
-                'VALET_SERVER_PATH',
-                'VALET_HOME_PATH',
-                'VALET_PHP_SOCKET',
-                'VALET_SITE',
-                'VALET_TLD',
+                'BERKAN_LOOPBACK',
+                'BERKAN_HTTP_PORT',
+                'BERKAN_HTTPS_PORT',
+                'BERKAN_SITE_PATH',
+                'BERKAN_SERVER_PATH',
+                'BERKAN_HOME_PATH',
+                'BERKAN_PHP_SOCKET',
+                'BERKAN_SITE',
+                'BERKAN_TLD',
             ],
             [
                 $config['loopback'] ?? BERKAN_LOOPBACK,
@@ -447,13 +447,13 @@ class Site
 
         return str_replace(
             [
-                'VALET_LOOPBACK',
-                'VALET_HTTP_PORT',
-                'VALET_HOME_PATH',
-                'VALET_PROXY_HOST_WS',
-                'VALET_PROXY_HOST',
-                'VALET_SITE',
-                'VALET_TLD',
+                'BERKAN_LOOPBACK',
+                'BERKAN_HTTP_PORT',
+                'BERKAN_HOME_PATH',
+                'BERKAN_PROXY_HOST_WS',
+                'BERKAN_PROXY_HOST',
+                'BERKAN_SITE',
+                'BERKAN_TLD',
             ],
             [
                 $config['loopback'] ?? BERKAN_LOOPBACK,
@@ -484,16 +484,16 @@ class Site
 
         return str_replace(
             [
-                'VALET_LOOPBACK',
-                'VALET_HTTP_PORT',
-                'VALET_HTTPS_PORT',
-                'VALET_HOME_PATH',
-                'VALET_PROXY_HOST_WS',
-                'VALET_PROXY_HOST',
-                'VALET_CERT',
-                'VALET_KEY',
-                'VALET_SITE',
-                'VALET_TLD',
+                'BERKAN_LOOPBACK',
+                'BERKAN_HTTP_PORT',
+                'BERKAN_HTTPS_PORT',
+                'BERKAN_HOME_PATH',
+                'BERKAN_PROXY_HOST_WS',
+                'BERKAN_PROXY_HOST',
+                'BERKAN_CERT',
+                'BERKAN_KEY',
+                'BERKAN_SITE',
+                'BERKAN_TLD',
             ],
             [
                 $config['loopback'] ?? BERKAN_LOOPBACK,

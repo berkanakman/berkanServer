@@ -130,7 +130,7 @@ class BerkanTest extends TestCase
     {
         $this->files->expects($this->once())
             ->method('get')
-            ->willReturn('VALET_LOOPBACK placeholder');
+            ->willReturn('BERKAN_LOOPBACK placeholder');
 
         $this->files->expects($this->once())
             ->method('put')

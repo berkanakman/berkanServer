@@ -98,25 +98,25 @@ class NginxTest extends TestCase
 
     public function test_build_configuration_replaces_basic_placeholders(): void
     {
-        $stub = 'worker VALET_LOOPBACK user VALET_USER group VALET_GROUP home VALET_HOME_PATH';
+        $stub = 'worker BERKAN_LOOPBACK user BERKAN_USER group BERKAN_GROUP home BERKAN_HOME_PATH';
 
         $result = $this->nginx->buildConfiguration($stub);
 
         $this->assertStringContainsString(BERKAN_LOOPBACK, $result);
-        $this->assertStringNotContainsString('VALET_LOOPBACK', $result);
-        $this->assertStringNotContainsString('VALET_USER', $result);
-        $this->assertStringNotContainsString('VALET_GROUP', $result);
-        $this->assertStringNotContainsString('VALET_HOME_PATH', $result);
+        $this->assertStringNotContainsString('BERKAN_LOOPBACK', $result);
+        $this->assertStringNotContainsString('BERKAN_USER', $result);
+        $this->assertStringNotContainsString('BERKAN_GROUP', $result);
+        $this->assertStringNotContainsString('BERKAN_HOME_PATH', $result);
     }
 
     public function test_build_configuration_replaces_port_placeholders(): void
     {
-        $stub = 'listen VALET_LOOPBACK:VALET_HTTP_PORT ssl VALET_HTTPS_PORT';
+        $stub = 'listen BERKAN_LOOPBACK:BERKAN_HTTP_PORT ssl BERKAN_HTTPS_PORT';
 
         $result = $this->nginx->buildConfiguration($stub);
 
-        $this->assertStringNotContainsString('VALET_HTTP_PORT', $result);
-        $this->assertStringNotContainsString('VALET_HTTPS_PORT', $result);
+        $this->assertStringNotContainsString('BERKAN_HTTP_PORT', $result);
+        $this->assertStringNotContainsString('BERKAN_HTTPS_PORT', $result);
         $this->assertStringContainsString('80', $result);
         $this->assertStringContainsString('443', $result);
     }
@@ -126,7 +126,7 @@ class NginxTest extends TestCase
         $this->config->updateKey('http_port', '8080');
         $this->config->updateKey('https_port', '8443');
 
-        $stub = 'listen VALET_LOOPBACK:VALET_HTTP_PORT ssl VALET_HTTPS_PORT';
+        $stub = 'listen BERKAN_LOOPBACK:BERKAN_HTTP_PORT ssl BERKAN_HTTPS_PORT';
 
         $result = $this->nginx->buildConfiguration($stub);
 
@@ -136,20 +136,20 @@ class NginxTest extends TestCase
 
     public function test_build_configuration_replaces_server_path(): void
     {
-        $stub = 'root VALET_SERVER_PATH';
+        $stub = 'root BERKAN_SERVER_PATH';
 
         $result = $this->nginx->buildConfiguration($stub);
 
-        $this->assertStringNotContainsString('VALET_SERVER_PATH', $result);
+        $this->assertStringNotContainsString('BERKAN_SERVER_PATH', $result);
     }
 
     public function test_build_configuration_replaces_homebrew_path(): void
     {
-        $stub = 'include VALET_HOMEBREW_PATH/etc/nginx/mime.types';
+        $stub = 'include BERKAN_HOMEBREW_PATH/etc/nginx/mime.types';
 
         $result = $this->nginx->buildConfiguration($stub);
 
-        $this->assertStringNotContainsString('VALET_HOMEBREW_PATH', $result);
+        $this->assertStringNotContainsString('BERKAN_HOMEBREW_PATH', $result);
         $this->assertStringContainsString(BREW_PREFIX, $result);
     }
 

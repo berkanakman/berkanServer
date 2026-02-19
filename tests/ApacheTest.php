@@ -103,26 +103,26 @@ class ApacheTest extends TestCase
 
     public function test_build_configuration_replaces_basic_placeholders(): void
     {
-        $stub = 'Listen VALET_LOOPBACK:80 User VALET_USER Group VALET_GROUP Path VALET_HOME_PATH';
+        $stub = 'Listen BERKAN_LOOPBACK:80 User BERKAN_USER Group BERKAN_GROUP Path BERKAN_HOME_PATH';
 
         $result = $this->apache->buildConfiguration($stub);
 
         $this->assertStringContainsString(BERKAN_LOOPBACK, $result);
-        $this->assertStringNotContainsString('VALET_LOOPBACK', $result);
-        $this->assertStringNotContainsString('VALET_USER', $result);
-        $this->assertStringNotContainsString('VALET_GROUP', $result);
-        $this->assertStringNotContainsString('VALET_HOME_PATH', $result);
+        $this->assertStringNotContainsString('BERKAN_LOOPBACK', $result);
+        $this->assertStringNotContainsString('BERKAN_USER', $result);
+        $this->assertStringNotContainsString('BERKAN_GROUP', $result);
+        $this->assertStringNotContainsString('BERKAN_HOME_PATH', $result);
         $this->assertStringContainsString('staff', $result);
     }
 
     public function test_build_configuration_replaces_port_placeholders(): void
     {
-        $stub = 'Listen VALET_LOOPBACK:VALET_HTTP_PORT HTTPS VALET_HTTPS_PORT';
+        $stub = 'Listen BERKAN_LOOPBACK:BERKAN_HTTP_PORT HTTPS BERKAN_HTTPS_PORT';
 
         $result = $this->apache->buildConfiguration($stub);
 
-        $this->assertStringNotContainsString('VALET_HTTP_PORT', $result);
-        $this->assertStringNotContainsString('VALET_HTTPS_PORT', $result);
+        $this->assertStringNotContainsString('BERKAN_HTTP_PORT', $result);
+        $this->assertStringNotContainsString('BERKAN_HTTPS_PORT', $result);
         $this->assertStringContainsString('80', $result);
         $this->assertStringContainsString('443', $result);
     }
@@ -132,7 +132,7 @@ class ApacheTest extends TestCase
         $this->config->updateKey('http_port', '8080');
         $this->config->updateKey('https_port', '8443');
 
-        $stub = 'Listen VALET_LOOPBACK:VALET_HTTP_PORT HTTPS VALET_HTTPS_PORT';
+        $stub = 'Listen BERKAN_LOOPBACK:BERKAN_HTTP_PORT HTTPS BERKAN_HTTPS_PORT';
 
         $result = $this->apache->buildConfiguration($stub);
 
@@ -142,20 +142,20 @@ class ApacheTest extends TestCase
 
     public function test_build_configuration_replaces_server_path(): void
     {
-        $stub = 'ServerRoot VALET_SERVER_PATH';
+        $stub = 'ServerRoot BERKAN_SERVER_PATH';
 
         $result = $this->apache->buildConfiguration($stub);
 
-        $this->assertStringNotContainsString('VALET_SERVER_PATH', $result);
+        $this->assertStringNotContainsString('BERKAN_SERVER_PATH', $result);
     }
 
     public function test_build_configuration_replaces_homebrew_path(): void
     {
-        $stub = 'LoadModule VALET_HOMEBREW_PATH/lib/modules';
+        $stub = 'LoadModule BERKAN_HOMEBREW_PATH/lib/modules';
 
         $result = $this->apache->buildConfiguration($stub);
 
-        $this->assertStringNotContainsString('VALET_HOMEBREW_PATH', $result);
+        $this->assertStringNotContainsString('BERKAN_HOMEBREW_PATH', $result);
         $this->assertStringContainsString(BREW_PREFIX, $result);
     }
 

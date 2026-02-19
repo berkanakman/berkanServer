@@ -81,7 +81,7 @@ class PhpFpm
         if ($isolated) {
             $versionNumber = str_replace(['php@', 'php'], '', $phpVersion) ?: $this->brew->getPhpVersion($phpVersion);
             $configContent = str_replace(
-                ['VALET_PHP_VERSION', 'VALET_ISOLATED_SOCKET'],
+                ['BERKAN_PHP_VERSION', 'BERKAN_ISOLATED_SOCKET'],
                 [$versionNumber, $this->isolatedSocketPath($phpVersion)],
                 $configContent
             );
@@ -105,9 +105,9 @@ class PhpFpm
 
         return str_replace(
             [
-                'VALET_USER',
-                'VALET_GROUP',
-                'VALET_HOME_PATH',
+                'BERKAN_USER',
+                'BERKAN_GROUP',
+                'BERKAN_HOME_PATH',
             ],
             [
                 user(),
@@ -131,7 +131,7 @@ class PhpFpm
             $this->files->ensureDirExists($confDPath);
             $this->files->put(
                 $confDPath . '/berkan-error-log.ini',
-                str_replace('VALET_HOME_PATH', $this->config->homePath(), $contents)
+                str_replace('BERKAN_HOME_PATH', $this->config->homePath(), $contents)
             );
         }
     }

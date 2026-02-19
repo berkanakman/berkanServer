@@ -133,7 +133,7 @@ class Berkan
 
         $this->files->put(
             $plistPath,
-            str_replace('VALET_LOOPBACK', $loopback, $stub)
+            str_replace('BERKAN_LOOPBACK', $loopback, $stub)
         );
 
         $this->cli->run("sudo launchctl load -w {$plistPath}");

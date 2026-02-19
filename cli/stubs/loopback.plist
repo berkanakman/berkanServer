@@ -9,7 +9,7 @@
         <string>/sbin/ifconfig</string>
         <string>lo0</string>
         <string>alias</string>
-        <string>VALET_LOOPBACK</string>
+        <string>BERKAN_LOOPBACK</string>
     </array>
     <key>RunAtLoad</key>
     <true/>

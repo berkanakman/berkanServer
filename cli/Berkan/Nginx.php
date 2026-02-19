@@ -61,14 +61,14 @@ class Nginx implements WebServer
 
         return str_replace(
             [
-                'VALET_HOMEBREW_PATH',
-                'VALET_LOOPBACK',
-                'VALET_HTTP_PORT',
-                'VALET_HTTPS_PORT',
-                'VALET_USER',
-                'VALET_GROUP',
-                'VALET_HOME_PATH',
-                'VALET_SERVER_PATH',
+                'BERKAN_HOMEBREW_PATH',
+                'BERKAN_LOOPBACK',
+                'BERKAN_HTTP_PORT',
+                'BERKAN_HTTPS_PORT',
+                'BERKAN_USER',
+                'BERKAN_GROUP',
+                'BERKAN_HOME_PATH',
+                'BERKAN_SERVER_PATH',
             ],
             [
                 BREW_PREFIX,
