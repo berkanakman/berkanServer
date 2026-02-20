@@ -35,6 +35,7 @@
   - [Supported Frameworks](#supported-frameworks)
   - [Configuration](#configuration)
   - [Error Display Control](#error-display-control)
+  - [Short Open Tag](#short-open-tag)
   - [Logs & Diagnostics](#logs--diagnostics)
   - [Architecture](#architecture)
   - [Troubleshooting](#troubleshooting)
@@ -57,6 +58,7 @@
   - [Desteklenen Framework'ler](#desteklenen-frameworkler)
   - [Konfigürasyon](#konfigürasyon)
   - [Hata Görüntüleme Kontrolü](#hata-görüntüleme-kontrolü)
+  - [Short Open Tag](#short-open-tag-1)
   - [Log ve Tanı](#log-ve-tanı)
   - [Mimari](#mimari)
   - [Sorun Giderme](#sorun-giderme)
@@ -138,6 +140,13 @@ Berkan lets you choose between **Apache** and **Nginx** during installation, and
 - Uses PHP-FPM `auto_prepend_file` for reliable per-request error control
 - Works consistently across all sites, including those with `.htaccess` rewrites and PHP version isolation
 - Settings persist in `config.json` and take effect immediately without restart
+
+### Short Open Tag
+
+- **Toggle PHP `short_open_tag`** with `berkan shorttag on` / `berkan shorttag off`
+- Enables or disables the `<?` short tag syntax across all installed PHP versions
+- Uses a dedicated `.ini` file (`berkan-short-open-tag.ini`) in each PHP version's `conf.d` directory
+- Settings persist in `config.json` and are applied via PHP-FPM restart
 
 ### Database Management
 
@@ -543,6 +552,9 @@ That's it. Every folder inside `~/Sites/` is now automatically available as `htt
 | `berkan tld [name]` | Get or set the TLD (default: `test`) |
 | `berkan loopback [address]` | Get or set the loopback IP (default: `127.0.0.1`) |
 | `berkan directory-listing [on/off]` | Toggle directory listing |
+| `berkan shorttag on` | Enable PHP `short_open_tag` (`<?` syntax) on all PHP versions |
+| `berkan shorttag off` | Disable PHP `short_open_tag` on all PHP versions |
+| `berkan shorttag` | Display current `short_open_tag` status |
 | `berkan error hide` | Hide PHP errors (notices, warnings, deprecations) on all sites |
 | `berkan error show` | Show PHP errors on all sites |
 | `berkan on-latest-version` | Display current Berkan version |
@@ -1103,7 +1115,8 @@ The main configuration file is at `~/.config/berkan/config.json`:
         "legacy-app": "php@7.4",
         "old-wordpress": "php@5.6"
     },
-    "hide_errors": false
+    "hide_errors": false,
+    "short_open_tag": false
 }
 ```
 
@@ -1119,6 +1132,7 @@ The main configuration file is at `~/.config/berkan/config.json`:
 | `databases` | Installed databases | `[]` |
 | `isolated_versions` | Per-site PHP version assignments | `{}` |
 | `hide_errors` | Hide PHP errors on all sites (`berkan error hide/show`) | `false` |
+| `short_open_tag` | Enable PHP `short_open_tag` (`berkan shorttag on/off`) | `false` |
 
 ### Configuration Directories
 
@@ -1190,6 +1204,25 @@ This approach works reliably across all scenarios:
 - Sites served via `server.php` fallback router
 
 The setting takes effect immediately for new requests without requiring a service restart.
+
+## Short Open Tag
+
+Berkan can globally enable or disable PHP's `short_open_tag` directive, which controls whether the `<?` short tag syntax is allowed (in addition to the standard `<?php`):
+
+```bash
+# Enable short open tag (<? syntax)
+berkan shorttag on
+
+# Disable short open tag (only <?php works)
+berkan shorttag off
+
+# Check current status
+berkan shorttag
+```
+
+Since `short_open_tag` is a `PHP_INI_PERDIR` directive, it cannot be changed at runtime with `ini_set()`. Berkan handles this by writing a dedicated `.ini` file (`berkan-short-open-tag.ini`) to each installed PHP version's `conf.d` directory and restarting PHP-FPM.
+
+The setting is applied to **all installed PHP versions** simultaneously.
 
 ## Logs & Diagnostics
 
@@ -1564,6 +1597,13 @@ Berkan, kurulum sırasında **Apache** veya **Nginx** arasında seçim yapmanız
 - Güvenilir istek bazlı hata kontrolü için PHP-FPM `auto_prepend_file` kullanır
 - `.htaccess` rewrite kuralları ve PHP versiyon izolasyonu olan siteler dahil tüm sitelerde tutarlı çalışır
 - Ayarlar `config.json`'da saklanır ve yeniden başlatma gerekmeden anında etki eder
+
+### Short Open Tag
+
+- `berkan shorttag on` / `berkan shorttag off` ile **PHP `short_open_tag` ayarını açıp kapatın**
+- Tüm kurulu PHP versiyonlarında `<?` kısa tag sözdizimini etkinleştirir veya devre dışı bırakır
+- Her PHP versiyonunun `conf.d` dizininde özel bir `.ini` dosyası (`berkan-short-open-tag.ini`) kullanır
+- Ayarlar `config.json`'da saklanır ve PHP-FPM yeniden başlatılarak uygulanır
 
 ### Veritabanı Yönetimi
 
@@ -1969,6 +2009,9 @@ Bu kadar! `~/Sites/` içindeki her klasör artık otomatik olarak `http://klasor
 | `berkan tld [isim]` | TLD'yi al veya ayarla (varsayılan: `test`) |
 | `berkan loopback [adres]` | Loopback IP'yi al veya ayarla (varsayılan: `127.0.0.1`) |
 | `berkan directory-listing [on/off]` | Dizin listelemeyi aç/kapat |
+| `berkan shorttag on` | Tüm PHP versiyonlarında `short_open_tag` etkinleştir (`<?` sözdizimi) |
+| `berkan shorttag off` | Tüm PHP versiyonlarında `short_open_tag` devre dışı bırak |
+| `berkan shorttag` | Mevcut `short_open_tag` durumunu göster |
 | `berkan error hide` | Tüm sitelerde PHP hatalarını gizle (notice, warning, deprecation) |
 | `berkan error show` | Tüm sitelerde PHP hatalarını göster |
 | `berkan on-latest-version` | Mevcut Berkan versiyonunu göster |
@@ -2529,7 +2572,8 @@ Ana konfigürasyon dosyası `~/.config/berkan/config.json` adresindedir:
         "eski-proje": "php@7.4",
         "eski-wordpress": "php@5.6"
     },
-    "hide_errors": false
+    "hide_errors": false,
+    "short_open_tag": false
 }
 ```
 
@@ -2545,6 +2589,7 @@ Ana konfigürasyon dosyası `~/.config/berkan/config.json` adresindedir:
 | `databases` | Kurulu veritabanları | `[]` |
 | `isolated_versions` | Site bazlı PHP versiyon atamaları | `{}` |
 | `hide_errors` | Tüm sitelerde PHP hatalarını gizle (`berkan error hide/show`) | `false` |
+| `short_open_tag` | PHP `short_open_tag` etkinleştir (`berkan shorttag on/off`) | `false` |
 
 ### Konfigürasyon Dizinleri
 
@@ -2616,6 +2661,25 @@ Bu yaklaşım tüm senaryolarda güvenilir şekilde çalışır:
 - `server.php` yedek yönlendirici üzerinden sunulan siteler
 
 Ayar, servis yeniden başlatma gerektirmeden yeni istekler için anında etki eder.
+
+## Short Open Tag
+
+Berkan, PHP'nin `short_open_tag` direktifini toplu olarak etkinleştirip devre dışı bırakabilir. Bu direktif, standart `<?php` etiketine ek olarak `<?` kısa tag sözdiziminin kullanılıp kullanılamayacağını kontrol eder:
+
+```bash
+# Short open tag'i etkinleştir (<? sözdizimi)
+berkan shorttag on
+
+# Short open tag'i devre dışı bırak (sadece <?php çalışır)
+berkan shorttag off
+
+# Mevcut durumu kontrol et
+berkan shorttag
+```
+
+`short_open_tag` bir `PHP_INI_PERDIR` direktifi olduğu için `ini_set()` ile runtime'da değiştirilemez. Berkan bunu, her kurulu PHP versiyonunun `conf.d` dizinine özel bir `.ini` dosyası (`berkan-short-open-tag.ini`) yazarak ve PHP-FPM'i yeniden başlatarak halleder.
+
+Ayar, **tüm kurulu PHP versiyonlarına** aynı anda uygulanır.
 
 ## Log ve Tanı
 

@@ -142,6 +142,9 @@ class PhpFpm
 
         // Install memory limits configuration
         $this->installMemoryLimitsConfiguration($phpVersion);
+
+        // Install short_open_tag configuration
+        $this->installShortOpenTagConfiguration($phpVersion);
     }
 
     /**
@@ -196,6 +199,27 @@ class PhpFpm
             $this->files->copy(
                 __DIR__ . '/../stubs/php-memory-limits.ini',
                 $confDPath . '/berkan-memory-limits.ini'
+            );
+        }
+    }
+
+    /**
+     * Install the short_open_tag configuration.
+     */
+    public function installShortOpenTagConfiguration(string $phpVersion): void
+    {
+        $contents = $this->files->get(__DIR__ . '/../stubs/berkan-short-open-tag.ini');
+
+        $shortOpenTag = $this->config->read()['short_open_tag'] ?? false;
+        $value = $shortOpenTag ? 'On' : 'Off';
+
+        $confDPath = $this->phpIniScanDir($phpVersion);
+
+        if ($confDPath) {
+            $this->files->ensureDirExists($confDPath);
+            $this->files->put(
+                $confDPath . '/berkan-short-open-tag.ini',
+                str_replace('BERKAN_SHORT_OPEN_TAG', $value, $contents)
             );
         }
     }

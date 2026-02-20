@@ -1263,6 +1263,39 @@ $app->command('server:switch', function (InputInterface $input, OutputInterface 
 })->descriptions('Switch between Apache and Nginx');
 
 /**
+ * Toggle short_open_tag.
+ */
+$app->command('shorttag [toggle]', function ($toggle = null) {
+    $config = resolve(\Berkan\Configuration::class);
+
+    if ($toggle !== null) {
+        should_be_sudo();
+
+        $enabled = in_array(strtolower($toggle), ['on', '1', 'true', 'yes']);
+        $config->updateKey('short_open_tag', $enabled);
+
+        $phpFpm = resolve(\Berkan\PhpFpm::class);
+        $brew = resolve(\Berkan\Brew::class);
+
+        foreach ($brew->supportedPhpVersions() as $formula) {
+            $phpFpm->installShortOpenTagConfiguration($formula);
+        }
+
+        // Restart all running PHP-FPM services
+        foreach ($brew->supportedPhpVersions() as $formula) {
+            if ($brew->isStartedService($formula)) {
+                $brew->restartService($formula);
+            }
+        }
+
+        info('Short open tag has been ' . ($enabled ? 'enabled' : 'disabled') . '.');
+    } else {
+        $enabled = $config->read()['short_open_tag'] ?? false;
+        output('Short open tag is ' . ($enabled ? 'enabled' : 'disabled'));
+    }
+})->descriptions('Toggle PHP short_open_tag on or off');
+
+/**
  * Toggle error display.
  */
 $app->command('error action', function ($action) {

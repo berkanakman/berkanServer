@@ -124,7 +124,7 @@ case "$1" in
         fi
 
         # Commands that need sudo only when setting a value (with argument)
-        if { [ "$1" = "tld" ] || [ "$1" = "loopback" ] || [ "$1" = "directory-listing" ]; } && [ -n "$2" ]; then
+        if { [ "$1" = "tld" ] || [ "$1" = "loopback" ] || [ "$1" = "directory-listing" ] || [ "$1" = "shorttag" ]; } && [ -n "$2" ]; then
             NEEDS_SUDO=true
         fi
 
