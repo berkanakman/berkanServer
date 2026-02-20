@@ -52,7 +52,8 @@ class Server
 
         if (file_exists($linkPath)) {
             if (is_link($linkPath)) {
-                return readlink($linkPath);
+                $target = readlink($linkPath);
+                return $target !== false ? $target : $linkPath;
             }
 
             return $linkPath;

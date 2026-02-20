@@ -556,6 +556,7 @@ $app->command('unlink [name]', function ($name = null) {
     $name = strtolower($name ?: basename(getcwd()));
 
     resolve(\Berkan\Site::class)->unlink($name);
+    resolve(\Berkan\Contracts\WebServer::class)->restart();
 
     info("The [{$name}] site has been unlinked.");
 })->descriptions('Remove a linked Berkan site');
@@ -948,6 +949,8 @@ $app->command('directory-listing [toggle]', function ($toggle = null) {
     $config = resolve(\Berkan\Configuration::class);
 
     if ($toggle !== null) {
+        should_be_sudo();
+
         $enabled = in_array(strtolower($toggle), ['on', '1', 'true', 'yes']);
         $config->updateKey('directory_listing', $enabled);
 

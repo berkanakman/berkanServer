@@ -110,9 +110,14 @@ class Site
                 return ! str_ends_with($site, '.proxy');
             })
             ->mapWithKeys(function ($site) use ($sitesPath) {
-                $realPath = $this->files->isLink($sitesPath . '/' . $site)
-                    ? $this->files->readLink($sitesPath . '/' . $site)
-                    : $sitesPath . '/' . $site;
+                $fullPath = $sitesPath . '/' . $site;
+
+                if ($this->files->isLink($fullPath)) {
+                    $linkTarget = $this->files->readLink($fullPath);
+                    $realPath = $linkTarget !== false ? $linkTarget : $fullPath;
+                } else {
+                    $realPath = $fullPath;
+                }
 
                 return [$site => $realPath];
             });
@@ -602,7 +607,8 @@ class Site
 
         if ($this->files->exists($linkPath)) {
             if ($this->files->isLink($linkPath)) {
-                return $this->files->readLink($linkPath);
+                $target = $this->files->readLink($linkPath);
+                return $target !== false ? $target : $linkPath;
             }
 
             return $linkPath;

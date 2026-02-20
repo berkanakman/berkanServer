@@ -172,7 +172,7 @@ class Database
             $realUser = getenv('BERKAN_SUDO_USER') ?: (getenv('SUDO_USER') ?: user());
 
             if ($realUser && file_exists($logFile)) {
-                $this->cli->quietly("chown {$realUser} " . escapeshellarg($logFile));
+                $this->cli->quietly("chown " . escapeshellarg($realUser) . " " . escapeshellarg($logFile));
                 // Truncate stale root error messages
                 file_put_contents($logFile, '');
             }
@@ -188,7 +188,7 @@ class Database
         $realUser = getenv('BERKAN_SUDO_USER') ?: (getenv('SUDO_USER') ?: user());
 
         if (posix_getuid() === 0 && $realUser) {
-            return "sudo -u {$realUser} {$brewBin} services {$action} {$service}";
+            return "sudo -u " . escapeshellarg($realUser) . " {$brewBin} services " . escapeshellarg($action) . " " . escapeshellarg($service);
         }
 
         return "{$brewBin} services {$action} {$service}";
